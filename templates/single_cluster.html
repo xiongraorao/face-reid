@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Cluster</title>
+</head>
+<body>
+<h1><span><a href="/">Back</a></span> </h1>
+
+    {% for img_base64 in img_list %}
+        {% if loop.index % 5 == 0 %}
+        <div><img src={{img_base64}} />
+         {% else %}
+         <img src={{img_base64}} />
+        {% endif %}
+        {% if loop.index % 5 == 4 %}
+            <img src={{img_base64}} /></div>
+        {% endif %}
+    {% endfor %}
+
+</body>
+
+<style>
+    div{
+        height:250px;
+        float: left;
+    }
+    img{
+        height:200px;
+        float:left;
+        margin: 10px;
+    }
+</style>
+</html>

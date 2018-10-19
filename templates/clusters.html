@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Clusters</title>
+</head>
+<body>
+<h1>Clusters</h1>
+<div>
+    <span>所有的类</span><br/>
+    <button><a href="/delete">清空</a></button><br/>
+    <button><a href="/">刷新</a></button></br>
+    {% for cluster in clusters %}
+        <a href="/cluster?id={{cluster}}">{{cluster}}</a><br>
+    {% endfor %}
+</div>
+</body>
+</html>
