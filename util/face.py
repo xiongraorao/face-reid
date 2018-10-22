@@ -14,6 +14,9 @@ class Face:
     y = 0
     width = 0
     height = 0
+    sideFace = 0
+    quality = 0
+    score = 0
 
 
 def get_list_files(path):
@@ -48,15 +51,18 @@ def detect(base64):
     headers = {'content-type': "application/json"}
     response = requests.post(url, data=json.dumps(data_request), headers=headers)
     text = json.loads(response.text)
-    # print(text)
+    print(text)
     if text['status'] == 0:
-        coordinate = Face()
+        face = Face()
         data = text['data'][0]
-        coordinate.x = data['left']
-        coordinate.y = data['top']
-        coordinate.width = data['width']
-        coordinate.height = data['height']
-        return coordinate
+        face.x = data['left']
+        face.y = data['top']
+        face.width = data['width']
+        face.height = data['height']
+        face.sideFace = data['sideFace']
+        face.quality = data['quality']
+        face.score = data['score']
+        return face
     else:
         return None
 
