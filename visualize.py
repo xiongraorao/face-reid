@@ -43,8 +43,27 @@ def delete():
     print('delet all cluster!')
     return redirect(url_for('index'))
 
+@app.route('/all', methods=["GET"])
+def all():
+    keys = r.keys('*')
+    clusters = [[]]
+    cluster = []
+    for key in keys:
+        cluster.append(key.decode('utf-8'))
+        img_file_list = read_image(key.decode('utf-8'))
+        img_list = []
+        for file in img_file_list:
+            f = open(file, 'rb')
+            b = 'data:image/jpeg;base64,' + base64.b64encode(f.read()).decode('utf-8')
+            img_list.append(b)
+        clusters.append(img_list)
+    clusters = clusters[1:]
+    #print('cluster len: ' ,len(cluster) , 'clusters len: ' , len(clusters))
+    #clusters = dict(zip(cluster, clusters))
+    return render_template('all.html', clusters=clusters, cluster=cluster)
+
 def read_image(cluster_id):
-    basedir = "F:\\secretstar-id\\" + cluster_id
+    basedir = "F:\\lfw-id\\" + cluster_id
     l = os.listdir(basedir)
     ret = []
     for i in l:

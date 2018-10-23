@@ -90,11 +90,11 @@ def pose(img):
 
         print("pitch: {} yaw: {} roll: {}".format(pitch, yaw, roll))
 
-        cv2.putText(img, "pitch: " + str(pitch), (int(2*cols/3), 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(255,0,0,0),2)
-        cv2.putText(img, "yaw: " + str(yaw), (int(2*cols/3), 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(255,0,0,0),2)
-        cv2.putText(img, "roll: " + str(roll), (int(2*cols/3), 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(255,0,0,0),2)
+        cv2.putText(img, "pitch: " + str(pitch), (int(2*cols/3), 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(255,0,0),2)
+        cv2.putText(img, "yaw: " + str(yaw), (int(2*cols/3), 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(255,0,0),2)
+        cv2.putText(img, "roll: " + str(roll), (int(2*cols/3), 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(255,0,0),2)
         return img
-    cv2.putText(img, "Cannot detect faces!", (int(2*cols/3), 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(255,0,0,0),2)
+    cv2.putText(img, "Cannot detect faces!", (int(2*cols/3), 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5,(255,0,0),2)
     return img
 if __name__ == "__main__":
     img = cv2.imread("F:\\01.jpg")

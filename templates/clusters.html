@@ -10,6 +10,7 @@
     <span>所有的类</span><br/>
     <button><a href="/delete">清空</a></button><br/>
     <button><a href="/">刷新</a></button></br>
+    <button><a href="/all">查看所有类别</a> </button><br/>
     {% for cluster in clusters %}
         <a href="/cluster?id={{cluster}}">{{cluster}}</a><br>
     {% endfor %}

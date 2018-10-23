@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>All Clusters</title>
+</head>
+<body>
+<h1><span><a href="/all">Back</a></span> </h1>
+{%for img_list in clusters%}
+    <div>
+    <span> Cluster:  {{loop.index}} </span><br/>
+    {% for img_base64 in img_list %}
+        <img src={{img_base64}} />
+    {% endfor %}
+    </div>
+{% endfor %}
+
+</body>
+
+<style>
+
+    img{
+        height:200px;
+        /*float:left;*/
+        margin: 10px;
+    }
+</style>
+</html>

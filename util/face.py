@@ -51,7 +51,7 @@ def detect(base64):
     headers = {'content-type': "application/json"}
     response = requests.post(url, data=json.dumps(data_request), headers=headers)
     text = json.loads(response.text)
-    print(text)
+    #print(text)
     if text['status'] == 0:
         face = Face()
         data = text['data'][0]
