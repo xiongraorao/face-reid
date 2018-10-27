@@ -3,10 +3,28 @@ this file is to measure the clustering result.
 '''
 
 import math
-import sys
+import sys,json
 
 import numpy as np
 
+
+class Sample(object):
+    def __init__(self, name, vector, c_name=None):
+        self.name = name  # 样本点的名字
+        self.vector = vector  # 样本点的特征向量
+        self.c_name = c_name  # 样本所属类名
+
+class Cluster(object):
+    def __init__(self, name, samples):
+        self.name = name  # 类名
+        self.samples = samples  #
+
+def sample_2_json(obj):
+    return {
+        'name': obj.name,
+        'vector': obj.vector,
+        'c_name': obj.c_name
+    }
 
 def cen(c1, c2):
     '''
@@ -47,110 +65,99 @@ def avg(cluster):
     return avg
 
 
-class Sample(object):
-    def __init__(self, name, vector, c_name=None):
-        self.name = name  # 样本点的名字
-        self.vector = vector  # 样本点的特征向量
-        self.c_name = c_name  # 样本所属类名
+def __pre(clusters1, clusters2):
+    """
+    :param clusters1: 标准类簇(GroundTruth)
+    :param clusters2:  聚类簇(Cluster)
+    :return: a, b, c, d
+    """
+    c1 = {}
+    c2 = {}
+    for cluster in clusters1:
+        for s in cluster.samples:
+            c1[s.name] = s.c_name  # dict: sample_name -> cluster_name
+    for cluster in clusters2:
+        for s in cluster.samples:
+            c2[s.name] = s.c_name  # dict: sample_name -> cluster_name
+
+    # 统计数量
+    a, b, c, d = 0, 0, 0, 0
+
+    # 对cluster进行排序操作,得到簇标记向量
+    c1 = [c1.get(k) for k in sorted(c1.keys())]
+    c2 = [c2.get(k) for k in sorted(c2.keys())]
+
+    for i in range(0, len(c1)):
+        for j in range(i + 1, len(c2)):
+            if i >= j:
+                continue
+            if c1[i] == c1[j] and c2[i] == c2[j]:
+                a += 1
+            elif c1[i] == c1[j] and c2[i] != c2[j]:
+                b += 1
+            elif c1[i] != c1[j] and c2[i] == c2[j]:
+                c += 1
+            else:
+                c += 1
+
+    return a, b, c, d
 
 
-class Cluster(object):
-    def __init__(self, name, samples):
-        self.name = name  # 类名
-        self.samples = samples  # 样本点的集合
+def inner_index(clusters1, clusters2):
+    '''
+    内部性能度量标准, 三个指数越大越好（0-1）之间
+    :param clusters1:
+    :param clusters2:
+    :return: 内部性能指数
+    '''
+    if len(clusters1) != len(clusters2):
+        print('cluster1 and cluster2 has not same length')
+        exit(0)
+    a, b, c, d = __pre(clusters1, clusters2)
+    m = len(clusters1)
+    jaccard = float(a / (a + b + c))
+    fmi = math.sqrt(float(a / (a + b)) * float(a / (a + c)))
+    ri = float(2 * (a + d) / (m * (m - 1)))
+    return jaccard, fmi, ri
 
-    def __pre(self, clusters1, clusters2):
 
-        """
-        :param clusters1: 标准类簇(GroundTruth)
-        :param clusters2:  聚类簇(Cluster)
-        :return: a, b, c, d
-        """
-        c1 = {}
-        c2 = {}
-        for cluster in clusters1:
-            for s in cluster.samples:
-                c1[s.name] = s.c_name  # dict: sample_name -> cluster_name
-        for cluster in clusters2:
-            for s in cluster.samples:
-                c2[s.name] = s.c_name  # dict: sample_name -> cluster_name
+def outer_index(clusters):
+    '''
+    外部性能度量标准,
+    :param clusters： 聚类的结果
+    :return: 外部性能指数， DBI 和DI指数， DBI越小越好，DI越大越好
+    '''
 
-        # 统计数量
-        a, b, c, d = 0, 0, 0, 0
+    # 得到簇划分
+    c = []
+    for cluster in clusters:
+        for s in cluster.samples:
+            c.append(s.c_name)
 
-        # 对cluster进行排序操作,得到簇标记向量
-        c1 = [c1.get(k) for k in sorted(c1.keys())]
-        c2 = [c2.get(k) for k in sorted(c2.keys())]
+    # 计算参数
+    k = len(clusters)  # 簇的个数
 
-        for i in range(0, len(c1)):
-            for j in range(i + 1, len(c2)):
-                if i >= j:
-                    continue
-                if c1[i] == c1[j] and c2[i] == c2[j]:
-                    a += 1
-                elif c1[i] == c1[j] and c2[i] != c2[j]:
-                    b += 1
-                elif c1[i] != c1[j] and c2[i] == c2[j]:
-                    c += 1
-                else:
-                    c += 1
+    DBI = 0
+    for i in range(0, k):
+        max = -1
+        for j in range(0, k):
+            if i == j:
+                continue
+            temp = (avg(clusters[i]) + avg(clusters[j])) / cen(clusters[i], clusters[j])
+            if max < temp:
+                max = temp
+        DBI += max
+    DBI = DBI / k
 
-        return a, b, c, d
+    DI = sys.maxsize
+    for i in range(0, k):
+        temp_min = sys.maxsize
+        for j in range(i + 1, k):
+            temp = min_c(clusters[i], clusters[j]) / max_diam(clusters)
+            temp_min = temp if temp < temp_min else temp_min
+        DI = temp_min if temp_min < DI else DI
 
-    def inner_index(self, clusters1, clusters2):
-        '''
-        内部性能度量标准, 三个指数越大越好（0-1）之间
-        :param clusters1:
-        :param clusters2:
-        :return: 内部性能指数
-        '''
-        if len(clusters1) != len(clusters2):
-            print('cluster1 and cluster2 has not same length')
-            exit(0)
-        a, b, c, d = self.__pre(self, clusters1, clusters2)
-        m = len(clusters1)
-        jaccard = float(a / (a + b + c))
-        fmi = math.sqrt(float(a / (a + b)) * float(a / (a + c)))
-        ri = float(2 * (a + d) / (m * (m - 1)))
-        return jaccard, fmi, ri
-
-    def outer_index(self, clusters):
-        '''
-        外部性能度量标准,
-        :param clusters： 聚类的结果
-        :return: 外部性能指数， DBI 和DI指数， DBI越小越好，DI越大越好
-        '''
-
-        # 得到簇划分
-        c = []
-        for cluster in clusters:
-            for s in cluster.samples:
-                c.append(s.c_name)
-
-        # 计算参数
-        k = len(clusters)  # 簇的个数
-
-        DBI = 0
-        for i in range(0, k):
-            max = -1
-            for j in range(0, k):
-                if i == j:
-                    continue
-                temp = (avg(clusters[i]) + avg(clusters[j])) / cen(clusters[i], clusters[j])
-                if max < temp:
-                    max = temp
-            DBI += max
-        DBI = DBI / k
-
-        DI = sys.maxsize
-        for i in range(0, k):
-            temp_min = sys.maxsize
-            for j in range(i + 1, k):
-                temp = min_c(clusters[i], clusters[j]) / max_diam(clusters)
-                temp_min = temp if temp < temp_min else temp_min
-            DI = temp_min if temp_min < DI else DI
-
-        return DBI, DI
+    return DBI, DI
 
 
 def min_c(c1, c2):
