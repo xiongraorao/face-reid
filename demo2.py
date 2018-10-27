@@ -90,6 +90,8 @@ if __name__ == '__main__':
                     samples.append(Sample(gt_s.name, feature, max_sim_cname))
                     print('合并成类，max_sim = %5f , c_name = %s ' % (max_sim, max_sim_cname))
             else:
+                # 删除 这个样本
+                gt_c.samples.remove(gt_s)
                 continue
             # img = estimate.pose(img)
             cv2.putText(img, str(idx) + '/' + str(sum), (20, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
@@ -105,7 +107,7 @@ if __name__ == '__main__':
         for s in c.samples:
             ss += json.dumps(s, default=M.sample_2_json)
         ss += ']'
-        content = "{'name':" + c.name + ", 'samples': [" + ss + "]}"
+        content = "{'name':" + c.name + ", 'samples': " + ss + "}"
         f.write(content)
     f.write(']')
     f.close()
