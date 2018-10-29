@@ -1,16 +1,20 @@
 import base64
-import datetime
+import time
 import json
 import os
 
-import cv2
+import cv2,redis
 
 import cluster.measure as M
 from cluster.measure import Sample, Cluster
-from demo import redis_connect
 from util import face
 
-lfw_dir = "F:\\datasets\\lfw"
+def redis_connect():
+    pool = redis.ConnectionPool(host='192.168.1.11', port=6379, db=6)
+    r = redis.Redis(connection_pool=pool)
+    return r
+
+lfw_dir = "F:\\datasets\\oceanai"
 output_dir = "F:\\lfw-id\\"
 
 all_imgs = face.get_list_files(lfw_dir)
@@ -54,11 +58,14 @@ if __name__ == '__main__':
     samples = get_all_feature2()
     up_th = 0.7  # 上阈值
     sum = len(all_imgs)
-    start = datetime.datetime.now()
+    start = time.clock()
+
+    # samples_to_delete
+    samples_to_delete = []
 
     # 更新gt_cluster 的特征向量
     idx = 0
-    for gt_c in gt_clusters:
+    for gtc_idx, gt_c in enumerate(gt_clusters):
         for gt_s in gt_c.samples:
             img = cv2.imread(gt_s.name)
             image = cv2.imencode('.jpg', img)[1]
@@ -91,7 +98,8 @@ if __name__ == '__main__':
                     print('合并成类，max_sim = %5f , c_name = %s ' % (max_sim, max_sim_cname))
             else:
                 # 删除 这个样本
-                gt_c.samples.remove(gt_s)
+                samples_to_delete.append((gtc_idx, gt_s))
+                print("检测不到人脸=====")
                 continue
             # img = estimate.pose(img)
             cv2.putText(img, str(idx) + '/' + str(sum), (20, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
@@ -99,22 +107,28 @@ if __name__ == '__main__':
             idx += 1
             if 0xFF & cv2.waitKey(5) == 27:
                 break
+
     # 保存 gt_cluster
-    f = open('./gt_cluster.txt', 'w')
-    f.write('[')
-    for c in gt_clusters:
-        ss = '['
-        for s in c.samples:
-            ss += json.dumps(s, default=M.sample_2_json)
-        ss += ']'
-        content = "{'name':" + c.name + ", 'samples': " + ss + "}"
-        f.write(content)
-    f.write(']')
-    f.close()
-    print('save gt_cluster done!')
+    # f = open('./gt_cluster.txt', 'w')
+    # f.write('[')
+    # for c in gt_clusters:
+    #     ss = '['
+    #     for s in c.samples:
+    #         ss += json.dumps(s, default=M.sample_2_json)
+    #     ss += ']'
+    #     content = "{'name':" + c.name + ", 'samples': " + ss + "}"
+    #     f.write(content)
+    # f.write(']')
+    # f.close()
+    # print('save gt_cluster done!')
+
+    # 更新 gt_clusters , 把检测不到人脸的图片过滤掉
+
+    for (c_i, s) in samples_to_delete:
+        gt_clusters[c_i].samples.remove(s)
 
     # 更新 pre_cluster
-    cluster_dic = {'a': 1}
+    cluster_dic = {}
     for sample in samples:
         if sample.c_name in cluster_dic.keys():
             ss = cluster_dic[sample.c_name]
@@ -127,62 +141,14 @@ if __name__ == '__main__':
 
     # 评价聚类结果
     print('clustering estimating ...')
+    print('total cluster: ', len(pre_clusters))
     print('inner index: ')
     jaccard, fmi, ri = M.inner_index(gt_clusters, pre_clusters)
-    print('jaccard index: {}, \n fmi index: {}, \n ri index: {}', (jaccard, fmi, ri))
+    print('jaccard index: %5f \nfmi index: %5f \nri index: %5f' % (jaccard, fmi, ri))
     DBI, DI = M.outer_index(pre_clusters)
     print('outer index: ')
-    print('DBI index: {}, \n DI index: {}', (DBI, DI))
+    print('DBI index: %5f \nDI index: %5f' % (DBI, DI))
 
-    # for idx, img in enumerate(all_imgs):
-    #     img = cv2.imread(img)
-    #     image = cv2.imencode('.jpg', img)[1]
-    #     b = str(base64.b64encode(image))[2:-1]
-    #     feature = face.extract(b)
-    #
-    #     if feature is not None:
-    #         coordinate = face.detect(b)
-    #         if coordinate.quality == 1 and coordinate.sideFace == 0 and coordinate.score > 0.95:
-    #             crop_img = img[coordinate.y:coordinate.y + coordinate.height,
-    #                        coordinate.x:coordinate.x + coordinate.width]
-    #             # 和redis库里面所有的样本进行比对
-    #             max_sim = -1.0
-    #             max_sim_id = -1.0
-    #             for idx, val in enumerate(features):
-    #                 similarity = face.cosine(feature, val)
-    #                 if similarity < max_sim:
-    #                     continue
-    #                 else:
-    #                     max_sim = similarity
-    #                     max_sim_id = ids[idx]
-    #             if 0 < max_sim < up_th or len(features) == 0:
-    #                 # new id
-    #                 random_id = uuid.uuid1()
-    #                 r.sadd(str(random_id), json.dumps(feature))
-    #                 features.append(feature)
-    #                 ids.append(str(random_id))
-    #                 dire = output_dir + str(random_id)
-    #                 if not os.path.exists(dire):
-    #                     os.mkdir(dire)
-    #                 cv2.imwrite(dire + "\\" + str(uuid.uuid1()) + ".jpg", crop_img)
-    #                 print("生成新的id，并保存到redis", ", sim: ", max_sim, ", count= ", idx)
-    #             else:
-    #                 # add in maximum feature list
-    #                 r.sadd(str(max_sim_id), json.dumps(feature))
-    #                 # add in features, in memory
-    #                 features.append(feature)
-    #                 ids.append(str(max_sim_id))
-    #                 # save img to folder
-    #                 dire = output_dir + str(max_sim_id)
-    #                 if not os.path.exists(dire):
-    #                     os.mkdir(dire)
-    #                 cv2.imwrite(dire + "\\" + str(uuid.uuid1()) + ".jpg", crop_img)
-    #                 print("匹配成功，并保存到redis", ", sim: ", max_sim, ", count= ", idx)
-    #         else:
-    #             pass
-    #     else:
-    #         pass
-    # img = cv2.resize(img, None, fx=0.3, fy=0.3, interpolation=cv2.INTER_CUBIC)
-    end = datetime.datetime.now()
-    print("total time:", str((end - start) / 1000) + 's')
+    end = time.clock()
+    print("total time: %5f s " % (end - start))
     cv2.destroyAllWindows()

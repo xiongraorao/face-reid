@@ -50,14 +50,15 @@ def avg(cluster):
     :param cluster: Cluster
     :return: 平均距离
     '''
-    C = len(cluster.samples)
+    samples = cluster.samples
+    C = len(samples)
     sum = 0
+    if C <= 1:
+        return 0
     for i in range(0, C):
         for j in range(i + 1, C):
-            if i >= j:
-                continue
-            vi = np.array(cluster[i].vector, dtype=float)
-            vj = np.array(cluster[j].vector, dtype=float)
+            vi = np.array(samples[i].vector, dtype=float)
+            vj = np.array(samples[j].vector, dtype=float)
             ## 计算cosine
             cos = vi.dot(vj) / (np.linalg.norm(vi) * np.linalg.norm(vj))
             sum += 1 - cos
@@ -86,7 +87,9 @@ def __pre(clusters1, clusters2):
     # 对cluster进行排序操作,得到簇标记向量
     c1 = [c1.get(k) for k in sorted(c1.keys())]
     c2 = [c2.get(k) for k in sorted(c2.keys())]
-
+    if len(c1) != len(c2):
+        print('ground truth and predict cluster should have same size')
+        exit(0)
     for i in range(0, len(c1)):
         for j in range(i + 1, len(c2)):
             if i >= j:
@@ -98,9 +101,9 @@ def __pre(clusters1, clusters2):
             elif c1[i] != c1[j] and c2[i] == c2[j]:
                 c += 1
             else:
-                c += 1
+                d += 1
 
-    return a, b, c, d
+    return a, b, c, d, len(c1)
 
 
 def inner_index(clusters1, clusters2):
@@ -110,11 +113,10 @@ def inner_index(clusters1, clusters2):
     :param clusters2:
     :return: 内部性能指数
     '''
-    if len(clusters1) != len(clusters2):
-        print('cluster1 and cluster2 has not same length')
-        exit(0)
-    a, b, c, d = __pre(clusters1, clusters2)
-    m = len(clusters1)
+    # if len(clusters1) != len(clusters2):
+    #     print('cluster1 and cluster2 has not same length')
+    #     exit(0)
+    a, b, c, d, m = __pre(clusters1, clusters2)
     jaccard = float(a / (a + b + c))
     fmi = math.sqrt(float(a / (a + b)) * float(a / (a + c)))
     ri = float(2 * (a + d) / (m * (m - 1)))
@@ -184,7 +186,7 @@ def max_diam(clusters):
     '''
     max = -1
     k = len(clusters)
-    for i in (0, k):
+    for i in range(0, k):
         temp = diam(clusters[i])
         max = temp if temp > max else max
     return max
@@ -196,12 +198,13 @@ def diam(c):
     :param c:
     :return:
     '''
-    C = len(c.samples)
+    samples = c.samples
+    C = len(samples)
     max = -1
     for si in range(0, C):
         for sj in range(si + 1, C):
-            vi = np.array(si.vector, dtype=float)
-            vj = np.array(sj.vector, dtype=float)
+            vi = np.array(samples[si].vector, dtype=float)
+            vj = np.array(samples[sj].vector, dtype=float)
             dist = 1 - vi.dot(vj) / (np.linalg.norm(vi) * np.linalg.norm(vj))
             if max < dist:
                 max = dist
