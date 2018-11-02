@@ -92,8 +92,6 @@ def __pre(clusters1, clusters2):
         exit(0)
     for i in range(0, len(c1)):
         for j in range(i + 1, len(c2)):
-            if i >= j:
-                continue
             if c1[i] == c1[j] and c2[i] == c2[j]:
                 a += 1
             elif c1[i] == c1[j] and c2[i] != c2[j]:
