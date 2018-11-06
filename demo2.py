@@ -14,7 +14,7 @@ def redis_connect():
     r = redis.Redis(connection_pool=pool)
     return r
 
-lfw_dir = "F:\\datasets\\oceanai"
+lfw_dir = "F:\\datasets\\lfw-sub"
 output_dir = "F:\\lfw-id\\"
 
 all_imgs = face.get_list_files(lfw_dir)
@@ -145,9 +145,9 @@ if __name__ == '__main__':
     print('inner index: ')
     jaccard, fmi, ri = M.inner_index(gt_clusters, pre_clusters)
     print('jaccard index: %5f \nfmi index: %5f \nri index: %5f' % (jaccard, fmi, ri))
-    DBI, DI = M.outer_index(pre_clusters)
+    DBI= M.outer_index(pre_clusters)
     print('outer index: ')
-    print('DBI index: %5f \nDI index: %5f' % (DBI, DI))
+    print('DBI index: %5f' % (DBI))
 
     end = time.clock()
     print("total time: %5f s " % (end - start))

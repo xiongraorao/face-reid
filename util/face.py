@@ -76,11 +76,14 @@ def extract2(file_path):
 def cosine(x, y):
     """
     求两个float数组的余弦
-    :param x:
-    :param y:
+    :param x: 正则化的特征向量
+    :param y: 正则化的特征向量
     :return:
     """
-    return np.dot(x, y) / (np.linalg.norm(x) * np.linalg.norm(y))
+    print("x norm: " , np.linalg.norm(x))
+    print("y norm: ", np.linalg.norm(y))
+    #return np.dot(x, y) / (np.linalg.norm(x) * np.linalg.norm(y))
+    return np.dot(x, y)
 
 
 if __name__ == '__main__':
