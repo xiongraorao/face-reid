@@ -103,6 +103,52 @@ def __pre(clusters1, clusters2):
 
     return a, b, c, d, len(c1)
 
+def __pre2(clusters1, clusters2):
+    '''
+    采用向量化的计算方法计算
+    :param clusters1: 标准类簇(GroundTruth)
+    :param clusters2:  聚类簇(Cluster)
+    :return:
+    '''
+    c1 = {}
+    c2 = {}
+    for cluster in clusters1:
+        for s in cluster.samples:
+            c1[s.name] = s.c_name  # dict: sample_name -> cluster_name
+    for cluster in clusters2:
+        for s in cluster.samples:
+            c2[s.name] = s.c_name  # dict: sample_name -> cluster_name
+
+    # 统计数量
+    a, b, c, d = 0, 0, 0, 0
+
+    # 对cluster进行排序操作,得到簇标记向量
+    c1 = [c1.get(k) for k in sorted(c1.keys())]
+    c2 = [c2.get(k) for k in sorted(c2.keys())]
+
+    # 构建一个二维数组,每个cell为（x,y) 判断x,y满足的条件即可
+    if len(c1) != len(c2):
+        print('ground truth and predict cluster should have same size')
+        exit(0)
+    n = len(c1)
+    c1 = np.array(c1).reshape(1,-1)
+    c2 = np.array(c2).reshape(1,-1)
+    c1_0 = np.repeat(c1, n, axis=0)
+    c1_1 = np.repeat(c1.reshape(-1,1), n, axis=1)
+    c2_0 = np.repeat(c2, n, axis=0)
+    c2_1 = np.repeat(c2.reshape(-1,1), n, axis=1)
+
+    temp = (c1_0 == c2_0) & (c1_1 == c2_1)
+    a = (np.sum(temp) - np.trace(temp))/2
+    temp = (c1_0 == c2_0) & (c1_1 != c2_1)
+    b = (np.sum(temp) - np.trace(temp))/2
+    temp = (c1_0 != c2_0) & (c1_1 == c2_1)
+    c = (np.sum(temp) - np.trace(temp))/2
+    temp = (c1_0 != c2_0) & (c1_1 != c2_1)
+    d = (np.sum(temp) - np.trace(temp))/2
+    assert a+b+c+d == n*(n-1)/2
+    print('a=%d, b=%d, c=%d, d=%d', (a,b,c,d))
+    return a,b,c,d,n
 
 def inner_index(clusters1, clusters2):
     '''
@@ -114,7 +160,7 @@ def inner_index(clusters1, clusters2):
     # if len(clusters1) != len(clusters2):
     #     print('cluster1 and cluster2 has not same length')
     #     exit(0)
-    a, b, c, d, m = __pre(clusters1, clusters2)
+    a, b, c, d, m = __pre2(clusters1, clusters2)
     jaccard = float(a / (a + b + c))
     fmi = math.sqrt(float(a / (a + b)) * float(a / (a + c)))
     ri = float(2 * (a + d) / (m * (m - 1)))
