@@ -8,6 +8,7 @@ from torchvision.transforms import transforms
 from  reid.model import ft_net
 from PIL import Image
 import torch.nn as nn
+import cv2
 import pdb
 
 def load_network(network, model_path):
@@ -36,11 +37,10 @@ def extract_feature(model, img):
     '''
     img: IPL read
     :param model: 网络
-    :param img: numpy
+    :param img: IPL Image
     :return: 1*2048 feature
     '''
     img = convert_img(img)
-    features = torch.FloatTensor()
     ff = torch.FloatTensor(1, 2048).zero_()
     for i in range(2):
         if (i == 1):
@@ -68,14 +68,20 @@ if __name__ == '__main__':
     feature = extract_feature(model, img)
     feature2 = extract_feature(model, img2)
     feature3 = extract_feature(model, img3)
+
+    img4 = cv2.imread('../img/0567/0567_c1s3_021401_00.jpg')
+    img4 = Image.fromarray(cv2.cvtColor(img4, cv2.COLOR_BGR2RGB))
+    feature4 = extract_feature(model, img4)
     #print(feature.cpu().numpy())
     #pdb.set_trace()
 
     d1 = torch.mm(feature, feature2.reshape(-1, 1))
     d2 = torch.mm(feature, feature3.reshape(-1, 1))
     d3 = torch.mm(feature2, feature3.reshape(-1,1))
+    d4 = torch.mm(feature4, feature2.reshape(-1,1))
 
     print('d1: same person sim = ', d1)
     print('d2: not same person sim = ', d2)
     print('d3: not same person sim = ', d3)
+    print('d4 should be the same with d1: ', d4)
 

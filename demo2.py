@@ -56,7 +56,7 @@ if __name__ == '__main__':
     r = redis_connect()
     # ids, features = get_all_feature()
     samples = get_all_feature2()
-    up_th = 0.7  # 上阈值
+    up_th = 0.75  # 上阈值
     sum = len(all_imgs)
     start = time.clock()
 
@@ -76,7 +76,7 @@ if __name__ == '__main__':
                 # 和redis库里面的样本比对
                 max_sim = -1.0
                 max_sim_cname = -1.0
-                for idx, val in enumerate(samples):
+                for _, val in enumerate(samples):
                     similarity = face.cosine(val.vector, feature)
                     if similarity > max_sim:
                         max_sim = similarity
@@ -145,9 +145,9 @@ if __name__ == '__main__':
     print('inner index: ')
     jaccard, fmi, ri = M.inner_index(gt_clusters, pre_clusters)
     print('jaccard index: %5f \nfmi index: %5f \nri index: %5f' % (jaccard, fmi, ri))
-    DBI= M.outer_index(pre_clusters)
-    print('outer index: ')
-    print('DBI index: %5f' % (DBI))
+    # DBI= M.outer_index(pre_clusters)
+    # print('outer index: ')
+    # print('DBI index: %5f' % (DBI))
 
     end = time.clock()
     print("total time: %5f s " % (end - start))

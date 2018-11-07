@@ -89,8 +89,8 @@ if __name__ == '__main__':
     net = init('../model/ssd300_mAP_77.43_v2.pth')
     data_dir = 'F:\\datasets\\lfw'
     img_list = get_list_files(data_dir)
-    capture = cv2.VideoCapture('rtsp://admin:123456@192.168.1.61:554/h264/ch1/main/av_stream') # ys
-    #capture = cv2.VideoCapture('rtsp://admin:iec123456@192.168.1.71:554/unicast/c1/s0/live') # hk
+    #capture = cv2.VideoCapture('rtsp://admin:123456@192.168.1.61:554/h264/ch1/main/av_stream') # ys
+    capture = cv2.VideoCapture('rtsp://admin:iec123456@192.168.1.72:554/unicast/c1/s0/live') # hk
     #capture = cv2.VideoCapture('../secretstar.mkv')
     frame_rate = 0.5  # 每秒抓一帧
     count = 0
