@@ -65,23 +65,24 @@ if __name__ == '__main__':
     img = Image.open('../img/0567/0567_c1s3_021401_00.jpg')
     img2 = Image.open('../img/0567/0567_c2s2_003887_00.jpg')
     img3 = Image.open('../img/0568/0568_c3s2_005237_00.jpg')
+    img4 = Image.open('../img/0568/0568_c5s2_005805_00.jpg')
     feature = extract_feature(model, img)
     feature2 = extract_feature(model, img2)
     feature3 = extract_feature(model, img3)
-
-    img4 = cv2.imread('../img/0567/0567_c1s3_021401_00.jpg')
-    img4 = Image.fromarray(cv2.cvtColor(img4, cv2.COLOR_BGR2RGB))
     feature4 = extract_feature(model, img4)
+
     #print(feature.cpu().numpy())
     #pdb.set_trace()
 
     d1 = torch.mm(feature, feature2.reshape(-1, 1))
     d2 = torch.mm(feature, feature3.reshape(-1, 1))
     d3 = torch.mm(feature2, feature3.reshape(-1,1))
-    d4 = torch.mm(feature4, feature2.reshape(-1,1))
+    d4 = torch.mm(feature4, feature3.reshape(-1,1))
+    d5 = torch.mm(feature2, feature4.reshape(-1,1))
 
     print('d1: same person sim = ', d1)
     print('d2: not same person sim = ', d2)
     print('d3: not same person sim = ', d3)
-    print('d4 should be the same with d1: ', d4)
+    print('d4: same person sim = ', d4)
+    print('d5: not same person sim = ', d5)
 

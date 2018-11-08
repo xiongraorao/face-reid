@@ -9,10 +9,11 @@ import numpy as np
 
 
 class Sample(object):
-    def __init__(self, name, vector, c_name=None):
+    def __init__(self, name, vector, c_name=None, ped_vector= []):
         self.name = name  # 样本点的名字
         self.vector = vector  # 样本点的特征向量
         self.c_name = c_name  # 样本所属类名
+        self.ped_vector = ped_vector
 
 
 class Cluster(object):
@@ -235,13 +236,13 @@ def __pre2(clusters1, clusters2):
     c2_0 = np.repeat(c2, n, axis=0)
     c2_1 = np.repeat(c2.reshape(-1, 1), n, axis=1)
 
-    temp = (c1_0 == c2_0) & (c1_1 == c2_1)
+    temp = (c1_0 == c1_1) & (c2_0 == c2_1)
     a = (np.sum(temp) - np.trace(temp)) / 2
-    temp = (c1_0 == c2_0) & (c1_1 != c2_1)
+    temp = (c1_0 == c1_1) & (c2_0 != c2_1)
     b = (np.sum(temp) - np.trace(temp)) / 2
-    temp = (c1_0 != c2_0) & (c1_1 == c2_1)
+    temp = (c1_0 != c1_1) & (c2_0 == c2_1)
     c = (np.sum(temp) - np.trace(temp)) / 2
-    temp = (c1_0 != c2_0) & (c1_1 != c2_1)
+    temp = (c1_0 != c1_1) & (c2_0 != c2_1)
     d = (np.sum(temp) - np.trace(temp)) / 2
     assert a + b + c + d == n * (n - 1) / 2
     print('a=%d, b=%d, c=%d, d=%d' % (a, b, c, d))

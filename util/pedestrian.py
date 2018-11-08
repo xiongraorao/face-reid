@@ -17,7 +17,6 @@ from PIL import Image
 import torch.nn as nn
 from ssd.data import VOC_CLASSES as lables
 from ssd.ssd import build_ssd
-from util.face import  zmq_detect, zmq_extract
 
 
 def init(ssd_model_path, reid_model_path, device_id=0):
@@ -157,20 +156,27 @@ def crop(img, ped_pos, face_pos=None):
     裁剪检测出来的行人
     :param img: 原始图像
     :param ped_pos: 行人坐标
-    :param face_pos: 人脸坐标（起到过滤作用）
+    :param face_pos: 人脸坐标（起到过滤作用）dict
     :return: cropped pedestrian
     '''
     rets = []
+    height, width = img.shape[:-1]
     for ped in ped_pos:
         ped = json.loads(ped)
         x = ped['x']
         y = ped['y']
         h = ped['h']
         w = ped['w']
+        # 坐标修正
+        x = 0 if x < 0 else x
+        y = 0 if y < 0 else y
+        h = height - y - 1 if y + h > height else  h
+        w = width - x - 1 if x + w > width else w
         print('x: {}, y: {}, height: {}, width: {}'.format(x, y, h, w))
         if face_pos is not None:
             if face_pos['x'] >= x and face_pos['y'] >= y and face_pos['h'] <= h and face_pos['w'] <= w:
                 rets.append(img[y:y + h, x:x + w]) # just add pedestrians which has include face_pos
+                return rets
         else:
             rets.append(img[y:y + h, x:x + w])
     return rets
@@ -180,8 +186,9 @@ if __name__ == '__main__':
     image = cv2.imread('../bike.jpg', cv2.IMREAD_COLOR)
     net, reid_model = init('../model/ssd300_mAP_77.43_v2.pth', '../model/ft_ResNet50/net_last.pth')
     # capture = cv2.VideoCapture('rtsp://admin:123456@192.168.1.61:554/h264/ch1/main/av_stream') # ys
-    capture = cv2.VideoCapture('rtsp://admin:iec123456@192.168.1.71:554/unicast/c1/s0/live')  # hk
+    # capture = cv2.VideoCapture('rtsp://admin:iec123456@192.168.1.71:554/unicast/c1/s0/live')  # hk
     # capture = cv2.VideoCapture('../secretstar.mkv')
+    capture = cv2.VideoCapture('../iec.mp4')
     frame_rate = 0.5  # 每秒抓一帧
     count = 0
     cv2.namedWindow('result', cv2.WINDOW_AUTOSIZE)
@@ -201,7 +208,7 @@ if __name__ == '__main__':
         h, w = img.shape[:2]
         # img = cv2.resize(img, (int(w/2), int(h/2)))
         result = detect(net, img)
-        image = visual(img, result, 0.5)
+        image = visual(img, result, 1)
         cv2.imshow('result', image)
 
         # extract pedestrian feature
