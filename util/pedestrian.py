@@ -17,6 +17,7 @@ from PIL import Image
 import torch.nn as nn
 from ssd.data import VOC_CLASSES as lables
 from ssd.ssd import build_ssd
+from util.face import  zmq_detect, zmq_extract
 
 
 def init(ssd_model_path, reid_model_path, device_id=0):
@@ -151,24 +152,28 @@ def extract_feature(model, img):
     return ff
 
 
-def crop(img, landmark):
+def crop(img, ped_pos, face_pos=None):
     '''
     裁剪检测出来的行人
     :param img: 原始图像
-    :param landmark: 行人坐标
+    :param ped_pos: 行人坐标
+    :param face_pos: 人脸坐标（起到过滤作用）
     :return: cropped pedestrian
     '''
     rets = []
-    for lm in landmark:
-        lm = json.loads(lm)
-        x = lm['x']
-        y = lm['y']
-        h = lm['h']
-        w = lm['w']
+    for ped in ped_pos:
+        ped = json.loads(ped)
+        x = ped['x']
+        y = ped['y']
+        h = ped['h']
+        w = ped['w']
         print('x: {}, y: {}, height: {}, width: {}'.format(x, y, h, w))
-        rets.append(img[y:y + h, x:x + w])
+        if face_pos is not None:
+            if face_pos['x'] >= x and face_pos['y'] >= y and face_pos['h'] <= h and face_pos['w'] <= w:
+                rets.append(img[y:y + h, x:x + w]) # just add pedestrians which has include face_pos
+        else:
+            rets.append(img[y:y + h, x:x + w])
     return rets
-
 
 if __name__ == '__main__':
     print('start detect pedestrian ...')
@@ -200,9 +205,9 @@ if __name__ == '__main__':
         cv2.imshow('result', image)
 
         # extract pedestrian feature
-        print('crop image from pedstrain')
+        print('crop image from pedestrian')
         images = crop(img, result)
-        # filter pedestrian whose face is in pedestrian
+
         if len(images) > 0:
             cv2.imshow('cropped image: ', images[0])
             ped_img = Image.fromarray(cv2.cvtColor(images[0], cv2.COLOR_BGR2RGB))

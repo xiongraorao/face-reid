@@ -111,13 +111,14 @@ def zmq_detect(base64):
     data = json.dumps(data)
     socket.send_string(data)
     message = socket.recv()
-    r = message[:-2]
-    print('zmq detect received message: ', r)
+    r = message[:-2].decode('utf-8')
+    # print('zmq detect received message: ', r)
     return r
 
-def zmq_extract(base64, landmark):
+def zmq_extract(base64, landmarks):
     '''
     zmq 版本的人脸特征提取
+    {"dimension":256,"error_message":"701","feature":[[0.026357347145676613 ,..., 0.061496846377849579]],"request_id":"76b43a14-d9c3-4be3-8b2a-a204f439f506","time_used":16}
     :param base64: crop 出来的人脸图像
     :param landmarks: detect 出来的landmark
     :return: 人脸特征
@@ -126,13 +127,12 @@ def zmq_extract(base64, landmark):
     context = zmq.Context()
     socket = context.socket(zmq.DEALER)
     socket.connect(url)
-    data = {'interface': '6', 'api_key': '', 'faces': [{'image_base64': base64, 'landmark': landmark}]}
+    data = {'interface': '6', 'api_key': '', 'image_base64': [base64], 'landmarks': [landmarks]}
     data = json.dumps(data)
-    print(data)
     socket.send_string(data)
     message = socket.recv()
-    r = message[:-2]
-    print('zmq extract feature: ', r)
+    r = message[:-2].decode('utf-8')
+    # print('zmq extract feature: ', r)
     return r
 
 if __name__ == '__main__':
@@ -142,15 +142,18 @@ if __name__ == '__main__':
 
     feature = extract(b64)
     zmq_d_result = json.loads(zmq_detect(b64))
-    landmark = zmq_d_result['detect'][0]['landmark']
+    landmarks = zmq_d_result['detect'][0]['landmark']
     f = detect(b64)
+    h_f = np.array(extract(b64))
     # crop
     img = cv2.imread('F:\\01.jpg')
     crop_img = img[f.y:f.y + f.height, f.x:f.x + f.width]
     crop_img = cv2.imencode('.jpg', crop_img)[1]
     crop_b64 = str(base64.b64encode(crop_img))[2:-1]
-    zmq_extract(crop_b64, landmark)
-    # todo : zmq_extract return 10005 error, it need to be handle
+    z_f = zmq_extract(crop_b64, landmarks)
+    z_f = json.loads(z_f)['feature'][0]
+    z_f = np.array(z_f)
+    print('sim: ', h_f.dot(z_f))
     #cv2.imshow('t', crop_img)
     while True:
         if cv2.waitKey(5) == 27:
