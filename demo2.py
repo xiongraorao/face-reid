@@ -2,6 +2,7 @@ import base64
 import time
 import json
 import os
+import numpy as np
 
 import cv2, redis, pdb
 
@@ -62,6 +63,7 @@ if __name__ == '__main__':
     up_th = 0.75  # 上阈值
     down_th = 0.6  # 下阈值
     ped_th = 0.9 # 行人特征阈值
+    top_k = 10 # 取topk进行比较
     sum = len(all_imgs)
     start = time.clock()
 
@@ -102,49 +104,58 @@ if __name__ == '__main__':
                 max_sim = -1.0
                 max_sim_cname = -1.0
                 max_sim_ped_vector = []
-                for val in samples:
-                    similarity = cosine(val.vector, feature)
-                    if similarity > max_sim:
-                        max_sim = similarity
-                        max_sim_cname = val.c_name
-                        max_sim_ped_vector = val.ped_vector
+
+                if len(samples) != 0:
+                    vectors = np.array([x.vector for x in samples])
+                    sims = np.dot(vectors, np.array(feature).T) # n*1
+                    sims = sims.reshape(-1,) # 变成一个一维数组
+                    sims_top = np.argsort(-sims)[:top_k]
+                    max_sim = sims[sims_top[0]]
+                    max_sim_cname = samples[sims_top[0]].c_name
+                    max_sim_ped_vector = samples[sims_top[0]].ped_vector
+
                 if 0 < max_sim < down_th or len(samples) == 0:
                     # as a new cluster
                     content = {'vector': feature, 'c_name': gt_s.c_name, 'ped_vector': ped_feature}
                     # print('content ', content)
                     r.set(gt_s.name, json.dumps(content))
                     # add sample to memory
-                    samples.append(Sample(gt_s.name, feature, gt_s.c_name))
+                    samples.append(Sample(gt_s.name, feature, gt_s.c_name, ped_feature))
                     print('单独成类, max_sim = %5f , c_name = %s ' % (max_sim, gt_s.c_name))
                 elif max_sim < up_th:
                     # 中间阈值加上行人判断
                     print('consider pedestrian detection result...')
 
-                    if len(max_sim_ped_vector) == 0 or len(ped_feature) == 0:
+                    if len(ped_feature) == 0:
                         # 没有行人特征，认为创建新类
                         content = {'vector': feature, 'c_name': gt_s.c_name, 'ped_vector': ped_feature}
                         r.set(gt_s.name, json.dumps(content))
-                        samples.append(Sample(gt_s.name, feature, gt_s.c_name))
-                        print('max_sim = %5f , c_name = %s ' % (max_sim, gt_s.c_name))
+                        samples.append(Sample(gt_s.name, feature, gt_s.c_name, ped_feature))
+                        print('===pedestrian===, max_sim = %5f , c_name = %s ' % (max_sim, gt_s.c_name))
                     else:
-                        ped_sim = cosine(max_sim_ped_vector, ped_feature)
+                        ped_sim = 0
+                        for i in sims_top:
+                            if len(samples[i].ped_vector) != 0:
+                                max_sim_ped_vector = samples[i].ped_vector
+                                ped_sim = cosine(max_sim_ped_vector, ped_feature)
+                                break
                         if ped_sim > ped_th:
                             # 认为同一个人，合并
                             content = {'vector': feature, 'c_name': max_sim_cname, 'ped_vector': ped_feature}
                             r.set(gt_s.name, json.dumps(content))
-                            samples.append(Sample(gt_s.name, feature, max_sim_cname))
+                            samples.append(Sample(gt_s.name, feature, max_sim_cname, ped_feature))
                         else:
                             # 没有行人特征，认为创建新类
                             content = {'vector': feature, 'c_name': gt_s.c_name, 'ped_vector': ped_feature}
                             r.set(gt_s.name, json.dumps(content))
-                            samples.append(Sample(gt_s.name, feature, gt_s.c_name))
-                        print('max_sim = %5f , c_name = %s, max_ped_sim = %5f ' % (max_sim, max_sim_cname, ped_sim))
+                            samples.append(Sample(gt_s.name, feature, gt_s.c_name, ped_feature))
+                        print('===pedestrian===, max_sim = %5f , c_name = %s, max_ped_sim = %5f ' % (max_sim, max_sim_cname, ped_sim))
                 else:
                     # remark c_name to the maximum similarity samples
                     content = {'vector': feature, 'c_name': max_sim_cname, 'ped_vector': ped_feature}
                     r.set(gt_s.name, json.dumps(content))
                     # add sample to memory
-                    samples.append(Sample(gt_s.name, feature, max_sim_cname))
+                    samples.append(Sample(gt_s.name, feature, max_sim_cname, ped_feature))
                     print('合并成类，max_sim = %5f , c_name = %s ' % (max_sim, max_sim_cname))
             if face_num == 0:
                 # 删除 这个样本
