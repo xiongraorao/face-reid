@@ -220,9 +220,20 @@ def __pre2(clusters1, clusters2):
     # 统计数量
     a, b, c, d = 0, 0, 0, 0
 
+    # 对 class name 做映射，得到0,1,2，。。。
+    t1 = set([c1.get(k) for k in c1.keys()])
+    dic1 = {}
+    for idx, val in enumerate(t1):
+        dic1[val] = idx
+    t2 = set([c2.get(k) for k in c2.keys()])
+    dic2 = {}
+    for idx, val in enumerate(t2):
+        dic2[val] = idx
+
     # 对cluster进行排序操作,得到簇标记向量
-    c1 = [c1.get(k) for k in sorted(c1.keys())]
-    c2 = [c2.get(k) for k in sorted(c2.keys())]
+    c1 = [dic1[c1.get(k)] for k in sorted(c1.keys())]
+    c2 = [dic2[c2.get(k)] for k in sorted(c2.keys())]
+    # todo 当key非常大的时候，内存耗尽
 
     # 构建一个二维数组,每个cell为（x,y) 判断x,y满足的条件即可
     if len(c1) != len(c2):
