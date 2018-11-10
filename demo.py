@@ -13,10 +13,15 @@ from util.face import face_feature, get_list_files, cosine
 from util import pedestrian as Ped
 from PIL import Image
 
-capture = cv2.VideoCapture("F:\iec.mp4")
+# capture = cv2.VideoCapture("F:\iec.mp4")
 # capture = cv2.VideoCapture("rtsp://admin:iec123456@192.168.1.71:554/unicast/c1/s0/live")
 # capture = cv2.VideoCapture(0)
-output_dir = "F:\\secretstar-id\\"
+# capture = cv2.VideoCapture('rtsp://admin:iec123456@192.168.1.72:554/unicast/c1/s0/live')  # hk
+# capture = cv2.VideoCapture('rtsp://admin:123456@192.168.1.61:554/h264/ch1/main/av_stream') # ys
+
+
+#output_dir = "F:\\secretstar-id\\"
+output_dir = '/home/xrr/output/'
 
 
 def redis_connect():
@@ -25,17 +30,32 @@ def redis_connect():
     return r
 
 
-def get_all_feature():
+# def get_all_feature():
+#     r = redis_connect()
+#     keys = r.keys('*')
+#     features = []
+#     ids = []
+#     for key in keys:
+#         for i in r.smembers(key):
+#             features.append(json.loads(i))
+#             # ids.append(str(key))
+#             ids.append(key)
+#     return ids, features
+
+def get_all_feature2():
+    '''
+    从redis数据库读取数据... 存储格式：key: 样本名，value: {'vector':[], 'c_name':''}
+    :return: samples 的list
+    '''
     r = redis_connect()
     keys = r.keys('*')
-    features = []
-    ids = []
+    samples = []
     for key in keys:
-        for i in r.smembers(key):
-            features.append(json.loads(i))
-            # ids.append(str(key))
-            ids.append(key)
-    return ids, features
+        content = r.get(key)
+        content = json.loads(content.decode('utf-8'))
+        sample = Sample(key.decode('utf-8'), content['vector'], content['c_name'], content['ped_vector'])
+        samples.append(sample)
+    return samples
 
 
 if __name__ == '__main__':
@@ -45,9 +65,10 @@ if __name__ == '__main__':
     r = redis_connect()
 
     # first load from redis
-    ids, features = get_all_feature()
+    samples = get_all_feature2()
     up_th = 0.75  # 上阈值
     down_th = 0.6  # 下阈值
+    ped_th = 0.9
     frame_rate = 0.5  # 每秒抓一帧
     top_k = 10
     count = 0
@@ -101,54 +122,75 @@ if __name__ == '__main__':
 
                 # 和redis库里面所有的样本进行比对
                 max_sim = -1.0
-                max_sim_id = -1.0
+                max_sim_cname = -1.0
+                max_sim_ped_vector = []
+                c_name = str(uuid.uuid4())
+                s_name = str(uuid.uuid4())
 
-                if len(features) != 0:
-                    vectors = np.array(features)
-                    sims = np.dot(features, np.array(feature).T)
-                    sims = sims.reshape(-1,)
-                    sim_top = np.argsort(-sims)[:top_k]
-                    max_sim = sims[sim_top[0]]
-                    max_sim_id = ids[sim_top[0]]
-
-                if 0 < max_sim < up_th or len(features) == 0:
+                if 0 < max_sim < up_th or len(samples) == 0:
                     # new id
-                    random_id = uuid.uuid1()
-                    r.sadd(str(random_id), json.dumps(feature))
-                    features.append(feature)
-                    ids.append(str(random_id))
-                    dire = output_dir + str(random_id)
+                    content = {'vector': feature, 'c_name': c_name, 'ped_vector': ped_feature}
+                    r.set(s_name, json.dumps(content))
+                    samples.append(Sample(s_name, feature, c_name, ped_feature))
+                    # features.append(feature)
+                    # ids.append(str(random_id))
+                    dire = output_dir + c_name
                     if not os.path.exists(dire):
                         os.mkdir(dire)
-                    cv2.imwrite(dire + "\\" + str(uuid.uuid1()) + ".jpg", crop_img)
+                    cv2.imwrite(dire + "\\" + s_name + ".jpg", crop_img)
                     print("生成新的id，并保存到redis", ", sim: ", max_sim)
-                elif max_sim < up_th:
-
-                    print('consider pedestrian detection result...')
-
-                    if len(ped_feature) == 0:
-                        # 没有检测到行人特征
-
-
-
                 else:
-                    # add in maximum feature list
-                    r.sadd(str(max_sim_id), json.dumps(feature))
-                    # add in features, in memory
-                    features.append(feature)
-                    ids.append(str(max_sim_id))
-                    # save img to folder
-                    dire = output_dir + str(max_sim_id)
-                    if not os.path.exists(dire):
-                        os.mkdir(dire)
-                    cv2.imwrite(dire + "\\" + str(uuid.uuid1()) + ".jpg", crop_img)
-                    print("匹配成功，并保存到redis", ", sim: ", max_sim)
+                    vectors = np.array([x.vector for x in samples])
+                    sims = np.dot(vectors, np.array(feature).T)
+                    sims = sims.reshape(-1, )
+                    sims_top = np.argsort(-sims)[:top_k]
+                    max_sim = sims[sims_top[0]]
+                    max_sim_cname = samples[sims_top[0]].c_name
+                    max_sim_ped_vector = samples[sims_top[0]].ped_vector
+
+                    if max_sim < up_th:
+                        print('consider pedestrian detection result...')
+                        c_name = str(uuid.uuid4())
+                        s_name = str(uuid.uuid4())
+                        if len(ped_feature) == 0:
+                            # 没有检测到行人特征,创建新类
+                            content = {'vector': feature, 'c_name': c_name, 'ped_vector': ped_feature}
+                            r.set(s_name, json.dumps(content))
+                            samples.append(Sample(s_name, feature, c_name, ped_feature))
+                            print('===pedestrian===, max_sim = %5f , c_name = %s ' % (max_sim, c_name))
+                        else:
+                            ped_sim = 0
+                            for i in sims_top:
+                                if len(samples[i].ped_vector) != 0:
+                                    max_sim_ped_vector = samples[i].ped_vector
+                                    ped_sim = cosine(max_sim_ped_vector, ped_feature)
+                                    break
+                            if ped_sim > ped_th:
+                                # 认为同一个人，合并
+                                content = {'vector': feature, 'c_name': max_sim_cname, 'ped_vector': ped_feature}
+                                r.set(s_name, json.dumps(content))
+                                samples.append(Sample(s_name, feature, max_sim_cname, ped_feature))
+                            else:
+                                # 没有行人特征，认为创建新类
+                                content = {'vector': feature, 'c_name': c_name, 'ped_vector': ped_feature}
+                                r.set(s_name, json.dumps(content))
+                                samples.append(Sample(s_name, feature, c_name, ped_feature))
+                            print('===pedestrian===, max_sim = %5f , c_name = %s, max_ped_sim = %5f ' % (
+                            max_sim, max_sim_cname, ped_sim))
+                    else:
+                        content = {'vector': feature, 'c_name': max_sim_cname, 'ped_vector': ped_feature}
+                        r.set(s_name, json.dumps(content))
+                        samples.append(Sample(s_name, feature, max_sim_cname, ped_feature))
+                        # save img to folder
+                        dire = output_dir + max_sim_cname
+                        if not os.path.exists(dire):
+                            os.mkdir(dire)
+                        cv2.imwrite(dire + "\\" + max_sim_cname + ".jpg", crop_img)
+                        print("匹配成功，并保存到redis", ", sim: ", max_sim)
+                cv2.imshow('crop_img', crop_img)
             else:
                 pass
-        else:
-            pass
         # img = cv2.resize(img, None, fx=0.3, fy=0.3, interpolation=cv2.INTER_CUBIC)
-        img = estimate.pose(img)
         cv2.imshow('img', img)
         if 0xFF & cv2.waitKey(5) == 27:
             break
