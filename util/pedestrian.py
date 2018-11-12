@@ -141,8 +141,14 @@ def extract_feature(model, img):
     ff = torch.FloatTensor(1, 2048).zero_()
     for i in range(2):
         if (i == 1):
-            img = fliplr(img.cuda())
-        input_img = Variable(img.cuda())
+            if torch.cuda.is_available():
+                img = fliplr(img.cuda())
+            else:
+                img = fliplr(img)
+        if torch.cuda.is_available():
+            input_img = Variable(img.cuda())
+        else:
+            input_img = Variable(img)
         outputs = model(input_img)
         f = outputs.data.cpu()
         ff = ff + f
