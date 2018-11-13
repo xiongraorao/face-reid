@@ -3,23 +3,20 @@ import time
 import json
 import os
 import numpy as np
-
 import cv2, redis, pdb
-
 import cluster.measure as M
 from cluster.measure import Sample, Cluster
 from util.face import face_feature, get_list_files, cosine
 from util import pedestrian as Ped
 from PIL import Image
+from config import *
+from util.face import mat_to_base64
+from demo import get_all_samples
 
 def redis_connect():
     pool = redis.ConnectionPool(host='192.168.1.11', port=6379, db=6)
     r = redis.Redis(connection_pool=pool)
     return r
-
-
-#lfw_dir = "F:\\datasets\\lfw-sub"
-lfw_dir = '/home/xrr/datasets/lfw-sub'
 
 all_imgs = get_list_files(lfw_dir)
 r = redis_connect()
@@ -40,26 +37,9 @@ for p in person_list:
     gt_clusters.append(Cluster(p, samples))
 
 
-def get_all_feature2():
-    '''
-    从redis数据库读取数据... 存储格式：key: 样本名，value: {'vector':[], 'c_name':''}
-    :return: samples 的list
-    '''
-    r = redis_connect()
-    keys = r.keys('*')
-    samples = []
-    for key in keys:
-        content = r.get(key)
-        content = json.loads(content.decode('utf-8'))
-        sample = Sample(key.decode('utf-8'), content['vector'], content['c_name'], content['ped_vector'])
-        samples.append(sample)
-    return samples
-
-
 if __name__ == '__main__':
     r = redis_connect()
-    # ids, features = get_all_feature()
-    samples = get_all_feature2()
+    samples = get_all_samples() # 从redis读取所有的样本
     up_th = 0.75  # 上阈值
     down_th = 0.6  # 下阈值
     ped_th = 0.9 # 行人特征阈值
@@ -78,9 +58,7 @@ if __name__ == '__main__':
     for gtc_idx, gt_c in enumerate(gt_clusters):
         for gt_s in gt_c.samples:
             img = cv2.imread(gt_s.name)
-            image = cv2.imencode('.jpg', img)[1]
-            b = str(base64.b64encode(image))[2:-1]
-            # feature = face.extract(b)
+            b = mat_to_base64(img)
             faces = face_feature(b)
             face_num = len(faces['detect_info'])
 
@@ -89,76 +67,82 @@ if __name__ == '__main__':
 
             for i in range(face_num):
                 feature = faces['feature'][i]
-                gt_s.vector = feature
+                detect_info = faces['detect_info'][i]
 
-                # pedestrian crop
-                ped_img = Ped.crop(img, ped_result, faces['detect_info'][i])
-                ped_feature = []
-                if len(ped_img) != 0:
-                    cv2.imshow('ped_img', ped_img[0])
-                    ped_img = Image.fromarray(cv2.cvtColor(ped_img[0], cv2.COLOR_BGR2RGB))
-                    ped_feature = Ped.extract_feature(reid_model, ped_img).cpu().numpy().tolist()[0]
-                gt_s.ped_vector = ped_feature
+                if detect_info['quality'] == 1 and detect_info['sideFace'] == 0 and detect_info['score'] > 0.95:
+                    gt_s.vector = feature
 
-                # 和redis库里面的样本比对
-                max_sim = -1.0
-                max_sim_cname = -1.0
-                max_sim_ped_vector = []
+                    # pedestrian crop
+                    ped_img = Ped.crop(img, ped_result, faces['detect_info'][i])
+                    ped_feature = []
+                    if len(ped_img) != 0:
+                        cv2.imshow('ped_img', ped_img[0])
+                        ped_img = Image.fromarray(cv2.cvtColor(ped_img[0], cv2.COLOR_BGR2RGB))
+                        ped_feature = Ped.extract_feature(reid_model, ped_img).cpu().numpy().tolist()[0]
+                    gt_s.ped_vector = ped_feature
 
-                if len(samples) != 0:
-                    vectors = np.array([x.vector for x in samples])
-                    sims = np.dot(vectors, np.array(feature).T) # n*1
-                    sims = sims.reshape(-1,) # 变成一个一维数组
-                    sims_top = np.argsort(-sims)[:top_k]
-                    max_sim = sims[sims_top[0]]
-                    max_sim_cname = samples[sims_top[0]].c_name
-                    max_sim_ped_vector = samples[sims_top[0]].ped_vector
+                    # 和redis库里面的样本比对
+                    max_sim = -1.0
+                    max_sim_cname = -1.0
+                    max_sim_ped_vector = []
 
-                if 0 < max_sim < down_th or len(samples) == 0:
-                    # as a new cluster
-                    content = {'vector': feature, 'c_name': gt_s.c_name, 'ped_vector': ped_feature}
-                    # print('content ', content)
-                    r.set(gt_s.name, json.dumps(content))
-                    # add sample to memory
-                    samples.append(Sample(gt_s.name, feature, gt_s.c_name, ped_feature))
-                    print('单独成类, max_sim = %5f , c_name = %s ' % (max_sim, gt_s.c_name))
-                elif max_sim < up_th:
-                    # 中间阈值加上行人判断
-                    print('consider pedestrian detection result...')
+                    if len(samples) != 0:
+                        vectors = np.array([x.vector for x in samples])
+                        sims = np.dot(vectors, np.array(feature).T) # n*1
+                        sims = sims.reshape(-1,) # 变成一个一维数组
+                        sims_top = np.argsort(-sims)[:top_k]
+                        max_sim = sims[sims_top[0]]
+                        max_sim_cname = samples[sims_top[0]].c_name
+                        max_sim_ped_vector = samples[sims_top[0]].ped_vector
 
-                    if len(ped_feature) == 0:
-                        # 没有行人特征，认为创建新类
+                    if 0 < max_sim < down_th or len(samples) == 0:
+                        # as a new cluster
                         content = {'vector': feature, 'c_name': gt_s.c_name, 'ped_vector': ped_feature}
+                        # print('content ', content)
                         r.set(gt_s.name, json.dumps(content))
+                        # add sample to memory
                         samples.append(Sample(gt_s.name, feature, gt_s.c_name, ped_feature))
-                        print('===pedestrian===, max_sim = %5f , c_name = %s ' % (max_sim, gt_s.c_name))
-                    else:
-                        ped_sim = 0
-                        for i in sims_top:
-                            if len(samples[i].ped_vector) != 0:
-                                max_sim_ped_vector = samples[i].ped_vector
-                                ped_sim = cosine(max_sim_ped_vector, ped_feature)
-                                break
-                        if ped_sim > ped_th:
-                            # 认为同一个人，合并
-                            content = {'vector': feature, 'c_name': max_sim_cname, 'ped_vector': ped_feature}
-                            r.set(gt_s.name, json.dumps(content))
-                            samples.append(Sample(gt_s.name, feature, max_sim_cname, ped_feature))
-                        else:
+                        print('单独成类, max_sim = %5f , c_name = %s ' % (max_sim, gt_s.c_name))
+                    elif max_sim < up_th:
+                        # 中间阈值加上行人判断
+                        print('consider pedestrian detection result...')
+
+                        if len(ped_feature) == 0:
                             # 没有行人特征，认为创建新类
                             content = {'vector': feature, 'c_name': gt_s.c_name, 'ped_vector': ped_feature}
                             r.set(gt_s.name, json.dumps(content))
                             samples.append(Sample(gt_s.name, feature, gt_s.c_name, ped_feature))
-                        print('===pedestrian===, max_sim = %5f , c_name = %s, max_ped_sim = %5f ' % (max_sim, max_sim_cname, ped_sim))
+                            print('===pedestrian===, max_sim = %5f , c_name = %s ' % (max_sim, gt_s.c_name))
+                        else:
+                            ped_sim = 0
+                            for i in sims_top:
+                                if len(samples[i].ped_vector) != 0:
+                                    max_sim_ped_vector = samples[i].ped_vector
+                                    ped_sim = cosine(max_sim_ped_vector, ped_feature)
+                                    break
+                            if ped_sim > ped_th:
+                                # 认为同一个人，合并
+                                content = {'vector': feature, 'c_name': max_sim_cname, 'ped_vector': ped_feature}
+                                r.set(gt_s.name, json.dumps(content))
+                                samples.append(Sample(gt_s.name, feature, max_sim_cname, ped_feature))
+                            else:
+                                # 没有行人特征，认为创建新类
+                                content = {'vector': feature, 'c_name': gt_s.c_name, 'ped_vector': ped_feature}
+                                r.set(gt_s.name, json.dumps(content))
+                                samples.append(Sample(gt_s.name, feature, gt_s.c_name, ped_feature))
+                            print('===pedestrian===, max_sim = %5f , c_name = %s, max_ped_sim = %5f ' % (max_sim, max_sim_cname, ped_sim))
+                    else:
+                        # remark c_name to the maximum similarity samples
+                        content = {'vector': feature, 'c_name': max_sim_cname, 'ped_vector': ped_feature}
+                        r.set(gt_s.name, json.dumps(content))
+                        # add sample to memory
+                        samples.append(Sample(gt_s.name, feature, max_sim_cname, ped_feature))
+                        print('合并成类，max_sim = %5f , c_name = %s ' % (max_sim, max_sim_cname))
                 else:
-                    # remark c_name to the maximum similarity samples
-                    content = {'vector': feature, 'c_name': max_sim_cname, 'ped_vector': ped_feature}
-                    r.set(gt_s.name, json.dumps(content))
-                    # add sample to memory
-                    samples.append(Sample(gt_s.name, feature, max_sim_cname, ped_feature))
-                    print('合并成类，max_sim = %5f , c_name = %s ' % (max_sim, max_sim_cname))
+                    # 删除 这个样本
+                    samples_to_delete.append((gtc_idx, gt_s))
+                    print('检测到的人脸质量不佳')
             if face_num == 0:
-                # 删除 这个样本
                 samples_to_delete.append((gtc_idx, gt_s))
                 print("检测不到人脸=====")
             # img = estimate.pose(img)
@@ -183,7 +167,6 @@ if __name__ == '__main__':
     # print('save gt_cluster done!')
 
     # 更新 gt_clusters , 把检测不到人脸的图片过滤掉
-
     for (c_i, s) in samples_to_delete:
         gt_clusters[c_i].samples.remove(s)
 
