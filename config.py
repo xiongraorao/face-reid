@@ -2,6 +2,7 @@ output_dir = '/home/xrr/output'
 redis_host = '192.168.1.11'
 redis_port = 6379
 redis_db = 5
+gpu_id = 1
 camera = {
     'cross': 'rtsp://admin:iec123456@192.168.1.72:554/unicast/c1/s0/live',
     'dev': 'rtsp://admin:iec123456@192.168.1.72:554/unicast/c1/s0/live',
