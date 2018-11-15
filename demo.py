@@ -3,6 +3,8 @@ import os
 import time
 import uuid
 from multiprocessing import Process, Queue
+import queue
+import threading
 
 import cv2
 import numpy as np
@@ -55,7 +57,7 @@ def grab(q, url):
                 count -= 1
                 continue
             q.put(img)
-            print('grab %d image' % count)
+            print('grab %d image' % (count/25))
             count += 1
     except KeyboardInterrupt:
         print('key interrupted , grab process exit')
@@ -104,8 +106,8 @@ def process(q):
     print('start process images')
     try:
         while True:
-            start = time.time()
             img = q.get()
+            start = time.time()
             img = cv2.resize(img, None, fx=resize_scale, fy=resize_scale, interpolation=cv2.INTER_CUBIC)
             height, width = img.shape[:-1]
             b = mat_to_base64(img)
@@ -236,8 +238,13 @@ def process(q):
         exit()
 
 if __name__ == '__main__':
-    q = Queue()
-    grab_proc = Process(target=grab, args=(q, camera['cross'],))
-    pro_proc = Process(target=process, args=(q,))
-    grab_proc.start()
-    pro_proc.start()
+    # q = Queue()
+    # grab_proc = Process(target=grab, args=(q, camera['cross'],))
+    # pro_proc = Process(target=process, args=(q,))
+    # grab_proc.start()
+    # pro_proc.start()
+
+    q = queue.Queue(1000)
+    grab_thread = threading.Thread(target=grab, args=(q, camera['cross']))
+    grab_thread.start()
+    process(q)

@@ -1,10 +1,12 @@
 import threading
 import time
+import os
 
 
 def show(msg):
     time.sleep(1)
-    print('thread name = %s, msg = %s' % (threading.current_thread().name, msg))
+    while True:
+        print('thread name = %s, msg = %s , pid = %d' % (threading.current_thread().name, msg, os.getpid()))
 
 
 class MyThread(threading.Thread):
