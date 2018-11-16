@@ -41,7 +41,7 @@ def index():
     #     print(c)
     ret = get_clusters(base_dir)
     clusters = [x for x in ret.keys()]
-    return render_template('clusters.html', clusters=clusters)
+    return render_template('clusters.html', clusters=clusters, size=len(clusters))
 
 
 @app.route('/cluster', methods=['GET'])
