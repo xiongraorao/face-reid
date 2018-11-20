@@ -49,6 +49,7 @@ def init(ssd_model_path, reid_model_path, device_id=0):
 def detect(net, img_array, threshold=0.6):
     '''
     检测行人坐标，返回置信度
+    :param threshold: 行人置信分数
     :arg img_array: bgr 顺序的图像数组
     :return:
     '''
@@ -89,7 +90,7 @@ def visual(img, landmark, scale=1.0):
     '''
     将检测的结果显示在图片上面
     :param img:
-    :param landmark:
+    :param landmark: detect的结果
     :return:
     '''
     h, w = img.shape[:2]
@@ -140,15 +141,9 @@ def extract_feature(model, img):
     img = convert_img(img)
     ff = torch.FloatTensor(1, 2048).zero_()
     for i in range(2):
-        if (i == 1):
-            if torch.cuda.is_available():
-                img = fliplr(img.cuda())
-            else:
-                img = fliplr(img)
-        if torch.cuda.is_available():
-            input_img = Variable(img.cuda())
-        else:
-            input_img = Variable(img)
+        if i == 1:
+            img = fliplr(img)
+        input_img = Variable(img.cuda())
         outputs = model(input_img)
         f = outputs.data.cpu()
         ff = ff + f
@@ -157,9 +152,10 @@ def extract_feature(model, img):
     return ff
 
 
-def crop(img, ped_pos, face_pos=None):
+def crop(img, ped_pos, rectified = True, face_pos=None):
     '''
     裁剪检测出来的行人
+    :param rectified: 是否启动行人过滤，false会排除检测到的不完整的行人
     :param img: 原始图像
     :param ped_pos: 行人坐标
     :param face_pos: 人脸坐标（起到过滤作用）dict
@@ -174,16 +170,20 @@ def crop(img, ped_pos, face_pos=None):
         h = ped['h']
         w = ped['w']
         # 坐标修正
-        x = 0 if x < 0 else x
-        y = 0 if y < 0 else y
-        h = height - y - 1 if y + h > height else  h
-        w = width - x - 1 if x + w > width else w
+        is_inner = True # 行人是否在画面里面
+        if rectified:
+            x = 0 if x < 0 else x
+            y = 0 if y < 0 else y
+            h = height - y - 1 if y + h > height else  h
+            w = width - x - 1 if x + w > width else w
+        else:
+            is_inner = x >=0 and x + w < width and y >=0 and y + h < height
         print('x: {}, y: {}, height: {}, width: {}'.format(x, y, h, w))
         if face_pos is not None:
             if face_pos['x'] >= x and face_pos['y'] >= y and face_pos['h'] <= h and face_pos['w'] <= w:
                 rets.append(img[y:y + h, x:x + w]) # just add pedestrians which has include face_pos
                 return rets
-        else:
+        elif is_inner:
             rets.append(img[y:y + h, x:x + w])
     return rets
 

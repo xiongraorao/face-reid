@@ -8,7 +8,7 @@
 <h1><span><a href="/">Back</a></span> </h1>
 {%for img_list in clusters%}
     <div>
-    <span> Cluster:  {{loop.index}} </span><br/>
+    <span> Cluster:  {{loop.index}} 样本数: {{ img_list | length }} </span><br/>
     {% for img_base64 in img_list %}
         <img src={{img_base64}} />
     {% endfor %}

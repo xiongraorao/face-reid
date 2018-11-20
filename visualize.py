@@ -1,17 +1,32 @@
 from flask import Flask, render_template, request, redirect,url_for
-from demo import redis_connect
 import os
 import base64
 import json
+import redis
+from config import *
+import argparse
 
-import pdb
+parser = argparse.ArgumentParser(description='which is used for visualizating cluster result')
+parser.add_argument('--redis_host','-rh', default=redis_host, help='redis host')
+parser.add_argument('--redis_port', '-rp', default=redis_port, help='redis port')
+parser.add_argument('--db', required=True, type=int, help='redis db')
+parser.add_argument('--dir', '-d', help='image base dir', default='/home/xrr/output')
+parser.add_argument('--host', default='192.168.1.6', help='web service host')
+parser.add_argument('--port', '-p', default=8888, help='web service port')
+args = parser.parse_args()
+
 app = Flask(__name__, static_url_path='')
 
+def redis_connect():
+    pool = redis.ConnectionPool(host=args.redis_host, port=args.redis_port, db=args.db)
+    r = redis.Redis(connection_pool=pool)
+    return r
+
 r = redis_connect()
-base_dir = '/home/xrr/output'
+base_dir = args.dir
 
 def visualize():
-    app.run(host="192.168.1.6", port="8888")
+    app.run(host=args.host, port=args.port)
 
 def get_clusters(dir_base):
     '''
@@ -33,12 +48,6 @@ def get_clusters(dir_base):
 
 @app.route('/', methods=['GET'])
 def index():
-    # keys = r.keys('*')
-    # clusters = []
-    # for key in keys:
-    #     clusters.append(key.decode('utf-8'))
-    # for c in clusters:
-    #     print(c)
     ret = get_clusters(base_dir)
     clusters = [x for x in ret.keys()]
     return render_template('clusters.html', clusters=clusters, size=len(clusters))
@@ -64,25 +73,19 @@ def delete():
     print('delet all cluster!')
     return redirect(url_for('index'))
 
+@app.route('/del', methods=['GET'])
+def delete_one():
+    cluster_id = request.args.get('id', '')
+    print('delete id = ',  id)
+    for key in r.keys('*'):
+        content = r.get(key)
+        content = json.loads(content.decode('utf-8'))
+        if cluster_id == content['c_name']:
+            r.delete(key)
+    return redirect(url_for('index'))
+
 @app.route('/all', methods=["GET"])
 def all():
-    # keys = r.keys('*')
-    # clusters = [[]]
-    # cluster = []
-
-    # for key in keys():
-    #     cluster.append(key.decode('utf-8'))
-    #     img_file_list = read_image(key.decode('utf-8'))
-    #     img_list = []
-    #     for file in img_file_list:
-    #         f = open(file, 'rb')
-    #         b = 'data:image/jpeg;base64,' + base64.b64encode(f.read()).decode('utf-8')
-    #         img_list.append(b)
-    #     clusters.append(img_list)
-    # clusters = clusters[1:]
-    # #print('cluster len: ' ,len(cluster) , 'clusters len: ' , len(clusters))
-    # #clusters = dict(zip(cluster, clusters))
-
     clusters = [[]]
     ret = get_clusters(base_dir)
     cluster = ret.keys()

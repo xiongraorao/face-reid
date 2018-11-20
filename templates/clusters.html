@@ -13,7 +13,7 @@
     <button><a href="/all">查看所有类别</a> </button><br/>
     <h2>总类数：{{ size }}</h2>
     {% for cluster in clusters %}
-      index: {{loop.index}} <a href="/cluster?id={{cluster}}">{{cluster}}</a><br>
+      index: {{loop.index}} <a href="/cluster?id={{cluster}}">{{cluster}}</a> <span><a href="/del?id={{cluster}}">删除</a></span> <br>
     {% endfor %}
 </div>
 </body>
