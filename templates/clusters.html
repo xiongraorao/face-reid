@@ -6,6 +6,11 @@
 </head>
 <body>
 <h1>Clusters</h1>
+<form action="/set" method="post">
+    base_dir: <input type="text" name="base_dir" value = {{dir}} /><br/>
+    redis_db: <input type="text" name="db"  value = {{db}} /><br/>
+    <input type="submit" value="设置"/>
+</form>
 <div>
     <span>所有的类</span><br/>
     <button><a href="/delete">清空</a></button><br/>

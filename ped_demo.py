@@ -8,6 +8,7 @@ import uuid
 from multiprocessing import Process, Queue
 import queue
 import threading
+import argparse
 
 import cv2
 import numpy as np
@@ -16,13 +17,11 @@ from PIL import Image
 
 from cluster.measure import Sample
 from config import *
-from util import pedestrian as Ped
+from util.pedestrian import Ped, grab
 from util.face import face_feature, cosine, mat_to_base64
 
-output_dir = '/home/xrr/output2'
-
 def redis_connect():
-    pool = redis.ConnectionPool(host=redis_host, port=redis_port, db=ped_db)
+    pool = redis.ConnectionPool(host=args.redis_host, port=args.redis_port, db=args.db)
     r = redis.Redis(connection_pool=pool)
     return r
 
@@ -42,32 +41,7 @@ def get_all_samples():
     return samples
 
 
-def grab(q, url, frame_rate = 1):
-    '''
-    抓图
-    :param q:
-    :return:
-    '''
-    capture = cv2.VideoCapture(url)
-    count = 0
-    #frame_rate = 2  # 每秒抓几帧
-    try:
-        while True:
-            ret, img = capture.read()
-            count += 1
-            if int(count * frame_rate) % 25 != 0:
-                continue
-            if ret is False:
-                count -= 1
-                continue
-            q.put(img)
-            print('grab %d image' % (count * frame_rate/25))
-            count += 1
-    except KeyboardInterrupt:
-        print('key interrupted , grab process exit')
-        exit()
-
-def process(q):
+def process(q, args):
     '''
     处理进程
     :param q:
@@ -78,15 +52,14 @@ def process(q):
     samples = get_all_samples()
     up_th = 0.75  # 上阈值
     down_th = 0.6  # 下阈值
-    ped_th = 0.93
-    person_threshold = 0.85
-    resize_scale = 0.5
+    ped_th = 0.8  # 判断行人是否为同一个的阈值
+    person_threshold = 0.85  # ssd 中行人的置信分数
+    resize_scale = args.resize_scale
     top_k = 10
     count = 0
 
     # initial ssd and reid
-    ssd_model, reid_model = Ped.init('model/ssd300_mAP_77.43_v2.pth', 'model/ft_ResNet50/net_last.pth', gpu_id)
-
+    ped = Ped(args)
     print('start process images')
     try:
         while True:
@@ -97,12 +70,12 @@ def process(q):
             b = mat_to_base64(img)
             #faces = face_feature(b)
             #face_num = len(faces['detect_info'])
-            ped_result = Ped.detect(ssd_model, img, person_threshold)
-            ped_imgs = Ped.crop(img, ped_result, False)
+            ped_result = ped.detect(img, person_threshold)
+            ped_imgs = ped.crop(img, ped_result, False)
 
             for i,ped_img in enumerate(ped_imgs):
                 ped_img_PIL = Image.fromarray(cv2.cvtColor(ped_img, cv2.COLOR_BGR2RGB))
-                ped_feature = Ped.extract_feature(reid_model, ped_img_PIL).cpu().numpy().tolist()[0]
+                ped_feature = ped.extract_feature(ped_img_PIL).cpu().numpy().tolist()[0]
                 feature = [] # 不考虑人脸特征，人脸特征为空
 
                 # 和redis库里面所有的样本进行比对
@@ -128,7 +101,7 @@ def process(q):
                     content = {'vector': feature, 'c_name': c_name, 'ped_vector': ped_feature}
                     r.set(s_name, json.dumps(content))
                     samples.append(Sample(s_name, feature, c_name, ped_feature))
-                    dire = output_dir + os.sep + c_name
+                    dire = args.save_dir + os.sep + c_name
                     if not os.path.exists(dire):
                         os.mkdir(dire)
                     cv2.imwrite(dire + os.sep + s_name + '.jpg', ped_img)
@@ -138,17 +111,15 @@ def process(q):
                     content = {'vector': feature, 'c_name': max_sim_cname, 'ped_vector': ped_feature}
                     r.set(s_name, json.dumps(content))
                     samples.append(Sample(s_name, feature, max_sim_cname, ped_feature))
-                    dire = output_dir + os.sep + max_sim_cname
+                    dire = args.save_dir + os.sep + max_sim_cname
                     if not os.path.exists(dire):
                         os.mkdir(dire)
                     cv2.imwrite(dire + os.sep + s_name + '.jpg', ped_img)
-                #cv2.putText(ped_img, 'max_sim: %f'% (max_sim), (100,100), cv2.FONT_HERSHEY_SIMPLEX, 6, (0,0,255), 2)
-                img = Ped.visual(img, ped_result)
+                img = ped.visual(img, ped_result)
                 cv2.imshow('ped_img', img)
-            else:
-                print('没有检测到行人')
 
-            print('cannot detect faces!')
+            if len(ped_imgs) == 0:
+                print('没有检测到行人')
             # cv2.imshow('img', img)
             if 0xFF & cv2.waitKey(5) == 27:
                 break
@@ -163,13 +134,24 @@ def process(q):
         exit()
 
 if __name__ == '__main__':
-    # q = Queue()
-    # grab_proc = Process(target=grab, args=(q, camera['cross'],))
-    # pro_proc = Process(target=process, args=(q,))
-    # grab_proc.start()
-    # pro_proc.start()
+    # 解析参数
+    parser = argparse.ArgumentParser(description='which is used for pedestrian re-identification')
+    parser.add_argument('--redis_host', '-rh', default=redis_host, help='redis host')
+    parser.add_argument('--redis_port', '-rp', default=redis_port, help='redis port')
+    parser.add_argument('--db', default=7, type=int, help='redis db')
+    parser.add_argument('--camera', '-c', default=camera['cross'], help='camera rtsp address')
+    parser.add_argument('--save_dir', '-s', default='/home/xrr/output2', help='which dir save grabbed pedestrian')
+    parser.add_argument('--resize_scale', '-rs', default=1, type=int, help='grabbed image resize scale')
+    parser.add_argument('--ped_th', default=0.8, type=float, help='pedestrian similarity threshold')
+    parser.add_argument('--frame_rate', default=2, type=int, help='grab image rate frames/s ')
+    parser.add_argument('--ssd_model', default='model/ssd300_mAP_77.43_v2.pth', help='ssd model path')
+    parser.add_argument('--reid_model', default='reid/model/dense121/net_49.pth', help='reid model path')
+    parser.add_argument('--gpu_id', type=int, default=0, help='gpu device number')
+    parser.add_argument('--use_dense', action='store_true', help='use densenet121')
+    parser.add_argument('--PCB', action='store_true', help='use PCB')
+    args = parser.parse_args()
 
     q = queue.Queue(1000)
-    grab_thread = threading.Thread(target=grab, args=(q, camera['cross'], 2))
+    grab_thread = threading.Thread(target=grab, args=(q, args.camera, args.frame_rate))
     grab_thread.start()
-    process(q)
+    process(q, args)
