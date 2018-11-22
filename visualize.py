@@ -52,7 +52,7 @@ def get_clusters():
 
 
 @app.route('/set', methods=['POST'])
-def set():
+def set_para():
     '''
     设置redis 数据库和图片的路径
     :return:
@@ -88,6 +88,7 @@ def cluster():
 
 @app.route('/delete', methods=["GET"])
 def delete():
+    del_dirs = []
     for key in r.keys('*'):
         content = r.get(key)
         content = json.loads(content.decode('utf-8'))
@@ -96,6 +97,12 @@ def delete():
         if os.path.exists(del_file):
             os.remove(del_file)
             print('delete success!===', del_file)
+        del_dirs.append(os.path.join(base_dir, content['c_name']))
+    for d in set(del_dirs):
+        print('to be delete dirs: ', d)
+        if not os.listdir(d):  # c_name 目录为空就删除
+            os.removedirs(d)
+            print('delete cluster name directory！===', os.path.join(base_dir, content['c_name']))
     print('delet all cluster!')
     return redirect(url_for('index'))
 
@@ -113,6 +120,9 @@ def delete_one():
             if os.path.exists(del_file):
                 os.remove(del_file)
                 print('delete success!===', del_file)
+    if not os.listdir(os.path.join(base_dir, content['c_name'])):
+        os.removedirs(os.path.join(base_dir, content['c_name']))
+        print('delete cluster name directory!===', os.path.join(base_dir, content['c_name']))
     return redirect(url_for('index'))
 
 
