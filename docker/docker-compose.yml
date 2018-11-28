@@ -1,0 +1,131 @@
+version: '3.1'
+
+services:
+  zoo1:
+    image: harbor.oceanai.com.cn/finder_dev/zookeeper
+    container_name: zoo1
+    restart: always
+    hostname: zoo1
+    ports:
+    - 21181:2181
+    environment:
+      ZOO_MY_ID: 1
+      ZOO_SERVERS: server.1=zoo1:2888:3888 server.2=zoo2:2888:3888 server.3=zoo3:2888:3888
+    volumes:
+    - /data/docker/zk1_data:/data
+    - /data/docker/zk1_log:/datalog
+
+  zoo2:
+    image: harbor.oceanai.com.cn/finder_dev/zookeeper
+    container_name: zoo2
+    restart: always
+    hostname: zoo2
+    ports:
+    - 21182:2181
+    environment:
+      ZOO_MY_ID: 2
+      ZOO_SERVERS: server.1=zoo1:2888:3888 server.2=0.0.0.0:2888:3888 server.3=zoo3:2888:3888
+    volumes:
+    - /data/docker/zk2_data:/data
+    - /data/docker/zk2_log:/datalog
+    
+  zoo3:
+    image: harbor.oceanai.com.cn/finder_dev/zookeeper
+    restart: always
+    container_name: zoo3
+    hostname: zoo3
+    ports:
+    - 21183:2181
+    environment:
+      ZOO_MY_ID: 3
+      ZOO_SERVERS: server.1=zoo1:2888:3888 server.2=zoo2:2888:3888 server.3=zoo3:2888:3888
+    volumes:
+    - /data/docker/zk3_data:/data
+    - /data/docker/zk3_log:/datalog
+    
+  kafka1:
+    image: harbor.oceanai.com.cn/finder_dev/kafka
+    hostname: kafka1
+    restart: always
+    ports:
+    - "19092:19092"
+    environment:
+      # add the entry "127.0.0.1    kafka1" to your /etc/hosts file
+      KAFKA_ZOOKEEPER_TIMEOUT_MS: 60000
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://192.168.1.6:19092"
+      KAFKA_NUM_RECOVERY_THREADS_PER_DATA_DIR: 4
+      #HOSTNAME_COMMAND: "docker info | grep ^Name: | cut -d' ' -f 2"
+      KAFKA_ZOOKEEPER_CONNECT: "zoo1:2181,zoo2:2181,zoo3:2181"
+      KAFKA_BROKER_ID: 1
+      KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
+    volumes:
+    - /data/docker/kafka1-data:/var/lib/kafka/data
+
+  kafka2:
+    image: harbor.oceanai.com.cn/finder_dev/kafka
+    hostname: kafka2
+    restart: always
+    ports:
+    - "19093:19093"
+    environment:
+      # add the entry "127.0.0.1    kafka1" to your /etc/hosts file
+      KAFKA_ZOOKEEPER_TIMEOUT_MS: 60000
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://192.168.1.6:19093"
+      KAFKA_NUM_RECOVERY_THREADS_PER_DATA_DIR: 4
+      #HOSTNAME_COMMAND: "docker info | grep ^Name: | cut -d' ' -f 2"
+      KAFKA_ZOOKEEPER_CONNECT: "zoo1:2181,zoo2:2181,zoo3:2181"
+      KAFKA_BROKER_ID: 2
+      KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
+    volumes:
+    - /data/docker/kafka2-data:/var/lib/kafka/data
+
+  kafka3:
+    image: harbor.oceanai.com.cn/finder_dev/kafka
+    hostname: kafka3
+    restart: always
+    ports:
+    - "19094:19094"
+    environment:
+      # add the entry "127.0.0.1    kafka1" to your /etc/hosts file
+      KAFKA_ZOOKEEPER_TIMEOUT_MS: 60000
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://192.168.1.6:19094"
+      KAFKA_NUM_RECOVERY_THREADS_PER_DATA_DIR: 4
+      #HOSTNAME_COMMAND: "docker info | grep ^Name: | cut -d' ' -f 2"
+      KAFKA_ZOOKEEPER_CONNECT: "zoo1:2181,zoo2:2181,zoo3:2181"
+      KAFKA_BROKER_ID: 3
+      KAFKA_LOG4J_LOGGERS: "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
+    volumes:
+    - /data/docker/kafka3-data:/var/lib/kafka/data
+
+  db:
+    image: harbor.oceanai.com.cn/finder_dev/mysql
+    restart: always
+    container_name: mysql
+    command: "mysqld --max-connections=5000 --default-time-zone='+8:00'"
+    ports:
+    - 13306:3306
+    volumes:
+    - /data/docker/mysql:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: oceanai
+
+  weed-master:
+    image: harbor.oceanai.com.cn/finder_dev/seaweedfs
+    hostname: master
+    restart: always
+    volumes:
+    - /data/docker/weed-master:/data
+    ports:
+    - 9333:9333
+    command: '/usr/bin/weed master -ip="192.168.1.6" -mdir="/data"'
+
+  weed-volume:
+    image: harbor.oceanai.com.cn/finder_dev/seaweedfs
+    restart: always
+    ports:
+    - 38080:38080
+    command: '/usr/bin/weed volume -max=5000 -dir="/data" -mserver="weed-master:9333" -ip="192.168.1.6" -port=38080'
+    volumes:
+    - /data/docker/weed-slave:/data
+    depends_on:
+    - weed-master
