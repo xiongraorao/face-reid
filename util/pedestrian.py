@@ -1,7 +1,6 @@
 import json
 import os
 import sys
-import time
 
 import cv2
 import numpy as np
@@ -14,7 +13,6 @@ if ssd_path not in sys.path:
     sys.path.append(ssd_path)
 
 from  reid.model import ft_net, ft_net_dense, PCB, PCB_test
-from PIL import Image
 import torch.nn as nn
 from ssd.data import VOC_CLASSES as lables
 from ssd.ssd import build_ssd
@@ -218,15 +216,20 @@ class Ped:
                 rets.append(img[y:y + h, x:x + w])
         return rets
 
-def grab(q, url, frame_rate = 1):
+
+def grab(q, url, frame_rate=1, logger=None):
     '''
     抓图
     :param frame_rate: 每秒抓几帧
     :param q:
     :return:
     '''
+    #print('启动抓取线程，url: %s, frame_rate: %d' % (url, frame_rate))
+    if logger is not None:
+        logger.info('[grab] 启动抓取线程，url: %s, frame_rate: %d' % (url, frame_rate))
     capture = cv2.VideoCapture(url)
     count = 0
+    count2 = 0
     try:
         while True:
             ret, img = capture.read()
@@ -237,7 +240,11 @@ def grab(q, url, frame_rate = 1):
                 count -= 1
                 continue
             q.put(img)
-            print('grab %d image' % (count * frame_rate / 25))
+            count = 0
+            count2 += 1
+            #print('[grab] grab %d image' % count2)
+            if logger is not None:
+                logger.info('[grab] grab %d image' % count2)
     except KeyboardInterrupt:
         print('key interrupted , grab process exit')
         exit()

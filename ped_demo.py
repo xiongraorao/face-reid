@@ -1,14 +1,14 @@
 '''
 行人检测的Demo
 '''
+import argparse
 import json
+import logging
 import os
-import time
-import uuid
-from multiprocessing import Process, Queue
 import queue
 import threading
-import argparse
+import time
+import uuid
 
 import cv2
 import numpy as np
@@ -17,8 +17,9 @@ from PIL import Image
 
 from cluster.measure import Sample
 from config import *
+from util.logger import Log
 from util.pedestrian import Ped, grab
-from util.face import face_feature, cosine, mat_to_base64
+
 
 def redis_connect():
     pool = redis.ConnectionPool(host=args.redis_host, port=args.redis_port, db=args.db)
@@ -41,7 +42,7 @@ def get_all_samples():
     return samples
 
 
-def process(q, args):
+def process(q, args, logger):
     '''
     处理进程
     :param q:
@@ -52,7 +53,7 @@ def process(q, args):
     samples = get_all_samples()
     up_th = 0.75  # 上阈值
     down_th = 0.6  # 下阈值
-    ped_th = 0.8  # 判断行人是否为同一个的阈值
+    ped_th = 0.75  # 判断行人是否为同一个的阈值
     person_threshold = 0.85  # ssd 中行人的置信分数
     resize_scale = args.resize_scale
     top_k = 10
@@ -60,16 +61,14 @@ def process(q, args):
 
     # initial ssd and reid
     ped = Ped(args)
-    print('start process images')
+    logger.info('start process images')
     try:
         while True:
             img = q.get()
             start = time.time()
             img = cv2.resize(img, None, fx=resize_scale, fy=resize_scale, interpolation=cv2.INTER_CUBIC)
-            height, width = img.shape[:-1]
-            b = mat_to_base64(img)
-            #faces = face_feature(b)
-            #face_num = len(faces['detect_info'])
+            # height, width = img.shape[:-1]
+            # b = mat_to_base64(img)
             ped_result = ped.detect(img, person_threshold)
             ped_imgs = ped.crop(img, ped_result, False)
 
@@ -97,7 +96,7 @@ def process(q, args):
 
                 if max_sim < ped_th:
                     # 新建一个新的行人ID
-                    print('不是同一个行人，新建ID')
+                    logger.info('不是同一个行人，新建ID')
                     content = {'vector': feature, 'c_name': c_name, 'ped_vector': ped_feature}
                     r.set(s_name, json.dumps(content))
                     samples.append(Sample(s_name, feature, c_name, ped_feature))
@@ -107,7 +106,7 @@ def process(q, args):
                     cv2.imwrite(dire + os.sep + s_name + '.jpg', ped_img)
 
                 else:
-                    print('同一个行人，合并')
+                    logger.info('同一个行人，合并')
                     content = {'vector': feature, 'c_name': max_sim_cname, 'ped_vector': ped_feature}
                     r.set(s_name, json.dumps(content))
                     samples.append(Sample(s_name, feature, max_sim_cname, ped_feature))
@@ -116,24 +115,27 @@ def process(q, args):
                         os.mkdir(dire)
                     cv2.imwrite(dire + os.sep + s_name + '.jpg', ped_img)
                 img = ped.visual(img, ped_result)
-                cv2.imshow('ped_img', img)
+                # cv2.imshow('ped_img', img)
 
             if len(ped_imgs) == 0:
-                print('没有检测到行人')
+                logger.info('没有检测到行人')
             # cv2.imshow('img', img)
             if 0xFF & cv2.waitKey(5) == 27:
                 break
             end = time.time()
-            print("消耗时间：%f ms， count = %d" % ((end - start) * 1000, count))
-            print('队列剩余长度：%d' % q.qsize())
+            logger.debug("消耗时间：%f ms， count = %d" % ((end - start) * 1000, count))
+            logger.debug('队列剩余长度：%d' % q.qsize())
             count += 1
             # capture.release()
             # cv2.destroyAllWindows()
     except KeyboardInterrupt:
-        print('key interrupted , image process exit')
+        logger.warning('key interrupted , image process exit')
         exit()
 
 if __name__ == '__main__':
+
+    logger = Log('ped_demo', path='logs/', level=logging.DEBUG)
+
     # 解析参数
     parser = argparse.ArgumentParser(description='which is used for pedestrian re-identification')
     parser.add_argument('--redis_host', '-rh', default=redis_host, help='redis host')
@@ -141,7 +143,7 @@ if __name__ == '__main__':
     parser.add_argument('--db', default=7, type=int, help='redis db')
     parser.add_argument('--camera', '-c', default=camera['cross'], help='camera rtsp address')
     parser.add_argument('--save_dir', '-s', default='/home/xrr/output2', help='which dir save grabbed pedestrian')
-    parser.add_argument('--resize_scale', '-rs', default=1, type=int, help='grabbed image resize scale')
+    parser.add_argument('--resize_scale', '-rs', default=1, type=float, help='grabbed image resize scale')
     parser.add_argument('--ped_th', default=0.8, type=float, help='pedestrian similarity threshold')
     parser.add_argument('--frame_rate', default=2, type=int, help='grab image rate frames/s ')
     parser.add_argument('--ssd_model', default='model/ssd300_mAP_77.43_v2.pth', help='ssd model path')
@@ -152,6 +154,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     q = queue.Queue(1000)
-    grab_thread = threading.Thread(target=grab, args=(q, args.camera, args.frame_rate))
-    grab_thread.start()
-    process(q, args)
+    for u in args.camera.split(','):
+        grab_thread = threading.Thread(target=grab, args=(q, args.camera, args.frame_rate, logger))
+        grab_thread.start()
+    process(q, args, logger=logger)
