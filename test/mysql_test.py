@@ -1,30 +1,27 @@
-import pymysql
+from util.mysql import Mysql
+from util.logger import Log
 
-db = pymysql.connect(host='192.168.1.11',
-                             port=3306,
-                             user='root',
-                             password='123456',
-                             db='face_reid',
-                             charset='utf8',
-                             )
+host='192.168.1.11'
+port=3306
+user='root'
+password='123456'
+db='face_reid'
+charset='utf8'
 
-cursor = db.cursor()
+logger = Log(__name__,is_save=False)
 
-# 使用 cursor() 方法创建一个游标对象 cursor
-cursor = db.cursor()
+db = Mysql(host, port, user, password, db, charset)
+db.set_logger(logger)
 
-# 使用 execute() 方法执行 SQL，如果表存在则删除
-cursor.execute("DROP TABLE IF EXISTS EMPLOYEE")
+sql = "insert into `t_camera` (`name`, `url`, `rate`, `grab`) values (%s, %s, %s, %s)"
 
-# 使用预处理语句创建表
-sql = """CREATE TABLE EMPLOYEE (
-         FIRST_NAME  CHAR(20) NOT NULL,
-         LAST_NAME  CHAR(20),
-         AGE INT,  
-         SEX CHAR(1),
-         INCOME FLOAT )"""
+db.insert(sql, ('test1', 'rtsp1', 10,10))
+db.insert(sql, ('test2', 'rtsp2', 20,20))
 
-cursor.execute(sql)
+sql = "select * from `t_camera`"
 
-# 关闭数据库连接
-db.close()
+db.truncate('t_camera')
+
+data = db.select(sql)
+
+print(data)

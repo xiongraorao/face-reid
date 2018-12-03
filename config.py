@@ -1,3 +1,4 @@
+import configparser,pymysql
 output_dir = '/home/xrr/output'
 redis_host = '192.168.1.11'
 redis_port = 6379
