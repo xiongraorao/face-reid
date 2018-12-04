@@ -4,6 +4,12 @@ CREATE TABLE IF NOT EXISTS `t_camera`(
   `url` VARCHAR(100) NOT NULL COMMENT '摄像头RTSP地址',
   `rate` INT DEFAULT 1 COMMENT '抓帧频率',
   `grab` INT DEFAULT 1 COMMENT '0表示不开启抓图，1表示开启抓图',
+  `state` INT DEFAULT 1 COMMENT '摄像头状态',
   `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `update_time` timestamp NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS `t_search`(
+  `id` INT PRIMARY KEY AUTO_INCREMENT,
+  ``
 )

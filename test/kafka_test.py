@@ -1,6 +1,6 @@
 from kafka import KafkaProducer, KafkaConsumer
 from kafka.admin import KafkaAdminClient, NewTopic, NewPartitions
-
+from util.mykafka import Kafka
 '''
 api doc: 
 https://github.com/dpkp/kafka-python/blob/master/README.rst
@@ -42,4 +42,13 @@ if __name__ == '__main__':
     #produce()
     #consume()
     #create_topic()
-    delete_topic(["test2"])
+    #delete_topic(["test2"])
+    kafka = Kafka(bootstrap_servers='192.168.1.6:19092')
+    #kafka.create_topics([('test1', 3, 3), ('test2', 3, 3)])
+    import time
+    for i in range(200):
+        kafka.produce('test1', 'test1 message: ' + str(i*4))
+        kafka.produce('test2', 'test2 message: ' + str(i*2))
+        print('send: ', i)
+        time.sleep(1)
+
