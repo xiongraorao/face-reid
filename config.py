@@ -17,7 +17,4 @@ lfw_dir = '/home/xrr/datasets/lfw-sub'
 search_host = '192.168.1.6'
 search_port = 2333
 
-# grab
-grab_lib = './ffmpeg-python.so'
-
 

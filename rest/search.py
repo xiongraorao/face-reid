@@ -4,6 +4,7 @@ from util.mysql import Mysql
 from util.logger import Log
 from rest.error import *
 import configparser
+from rest.http_util import check_param, update_param
 
 search = Blueprint('search',__name__,)
 logger = Log(__name__, is_save=False)
@@ -19,21 +20,10 @@ db.set_logger(logger)
 default_param = {
     'topk': 100,
 }
-need_param = {'image_base64','start_pos','limit'}
-all_param = need_param.copy()
-all_param.update({'query_id','camera_ids','topk'})
+nessary_params = {'image_base64','start_pos','limit'}
+optional_params = {'query_id','camera_ids','topk'}
 
-def is_param_leagle(params):
-    if len(need_param.difference(params)) == 0 and len(set(params).difference(all_param)) == 0:
-        return True
-    return False
-
-def updata_param(default, input):
-    ret = default.copy()
-    ret.update(input)
-    return ret
-
-@search.route('/search', )
+@search.route('/', methods=['POST'])
 def search():
     '''
     人脸搜索，动态库检索
@@ -48,11 +38,12 @@ def search():
         logger.warning(GLOBAL_ERR['json_syntax_err'])
         ret['message'] = GLOBAL_ERR['json_syntax_err']
         return json.dumps(ret)
-    if not is_param_leagle(data):
+    if not check_param(data, nessary_params, optional_params):
         logger.warning(GLOBAL_ERR['param_err'])
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
-    # update parameters
-    params = updata_param(default_param, data)
+    params = update_param(default_param, data)
 
     # todo do search job
+    # 1. 启动查询线程，将查询结果放到数据库中
+

@@ -113,3 +113,17 @@ if __name__ == '__main__':
     # with open('F:\\hhh.jpg', 'wb') as f:
     #     f.write(ret_bytes)
 
+    # test for cv to download or upload data
+    import cv2
+    import numpy as np
+    img = cv2.imread('F:\\man.jpg')
+    ret = weed.assign()
+    fid = ret['fid']
+    print(ret)
+    bs = []
+    bs = cv2.imencode('.jpg', img)
+    ret = weed2.upload(fid, bs[1], 'man.jpg')
+    print(ret)
+    img2 = weed2.dowload(fid)
+    cv2.imshow('img', cv2.imdecode(np.fromstring(img2, np.uint8), cv2.IMREAD_COLOR))
+    cv2.waitKey(0)

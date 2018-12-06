@@ -23,6 +23,8 @@ def sub_proc2():
     print(out.decode('utf-8'))
     print('exit')
 
+def sub_proc3():
+    print('start subProcess')
 
 if __name__ == '__main__':
     sub_proc1()
