@@ -38,20 +38,39 @@ class Mysql():
             ret = cursor.execute(sql, args)
             if hasattr(self, 'logger'):
                 self.logger.info('SQL execute success! %d row has been changed!' % ret)
-            self.connection.commit()
+            #self.connection.commit()
             id = self.connection.insert_id()
             cursor.close()
             return id
         except pymysql.MySQLError:
             if hasattr(self, 'logger'):
                 self.logger.error('MySQL error! roll back ...')
-            self.connection.rollback()
+            self.rollback()
             cursor.close()
             return -1
 
+    def commit(self):
+        self.connection.commit()
+
+    def rollback(self):
+        self.connection.rollback()
+
+    def close(self):
+        self.connection.close()
+
+
+    def delete(self, sql, args=None):
+        '''
+         删除操作
+         :param sql:
+         :param args:
+         :return: no
+         '''
+        self.update(sql, args)
+
     def update(self, sql, args=None):
         '''
-        删除和更新操作
+        更新操作, 需要手动commit
         :param sql:
         :param args:
         :return: no
@@ -61,13 +80,13 @@ class Mysql():
             ret = cursor.execute(sql, args)
             if hasattr(self, 'logger'):
                 self.logger.info('SQL execute success! %d row has been changed!' % ret)
-            self.connection.commit()
+            #self.connection.commit()
             cursor.close()
             return True
         except pymysql.MySQLError:
             if hasattr(self, 'logger'):
                 self.logger.error('MySQL error! roll back ...')
-            self.connection.rollback()
+            self.rollback()
             cursor.close()
             return False
 
@@ -84,12 +103,13 @@ class Mysql():
             if hasattr(self, 'logger'):
                 self.logger.info('SQL execute success! %d row has been changed!' % ret)
             data = cursor.fetchall()
+            self.commit()
             cursor.close()
             return data
         except pymysql.MySQLError:
             if hasattr(self, 'logger'):
                 self.logger.error('MySQL error! roll back ...')
-            self.connection.rollback()
+            self.rollback()
             cursor.close()
             return [[]]
 
@@ -100,12 +120,10 @@ class Mysql():
             ret = cursor.execute(sql)
             if hasattr(self, 'logger'):
                 self.logger.info('SQL execute success! %s has been truncated!' % table_name)
+            self.commit()
             cursor.close()
         except pymysql.MySQLError:
             if hasattr(self, 'logger'):
                 self.logger.error('MySQL error! roll back ...')
-            self.connection.rollback()
+            self.rollback()
             cursor.close()
-
-    def close(self):
-        self.connection.close()

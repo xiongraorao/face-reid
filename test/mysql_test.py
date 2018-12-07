@@ -13,14 +13,15 @@ logger = Log(__name__,is_save=False)
 db = Mysql(host, port, user, password, db, charset)
 db.set_logger(logger)
 
-# sql = "insert into `t_camera` (`name`, `url`, `rate`, `grab`) values (%s, %s, %s, %s)"
+sql = "insert into `t_camera` (`name`, `url`, `rate`, `grab`) values (%s, %s, %s, %s)"
 
-# db.insert(sql, ('test1', 'rtsp1', 10,10))
+db.insert(sql, ('test1', 'rtsp1', 10,10))
+db.commit()
 # db.insert(sql, ('test2', 'rtsp2', 20,20))
 
 sql = "select `url` from `t_camera` where id = %s"
 
-# db.truncate('t_camera')
+db.truncate('t_camera')
 
 data = db.select(sql, 2)
 

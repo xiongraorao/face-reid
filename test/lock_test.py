@@ -12,7 +12,7 @@ def add():
     for i in range(100000):
         summary += 1
         summary -= 1
-    lock.release()
+    lock.__release()
 
 
 def start():

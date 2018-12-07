@@ -62,6 +62,7 @@ class Kafka:
 if __name__ == '__main__':
     kafka = Kafka(bootstrap_servers='192.168.1.6:19092')
     topics = ['test1', 'test2']
+    topics = ['grab_image']
     consumer = kafka.consume(topics, group_id='test')
     # for message in consumer:
     #     print("%s:%d:%d: key=%s value=%s" % (message.topic, message.partition,

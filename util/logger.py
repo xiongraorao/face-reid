@@ -21,16 +21,24 @@ class Log:
             file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
             self.logger.addHandler(file_handler)
 
-    def debug(self, msg):
+    def debug(self, msg, *args):
+        for arg in args:
+            msg += ' ' + str(arg)
         self.logger.debug(msg)
 
-    def info(self, msg):
+    def info(self, msg, *args):
+        for arg in args:
+            msg += ' ' + str(arg)
         self.logger.info(msg)
 
-    def warning(self, msg):
+    def warning(self, msg, *args):
+        for arg in args:
+            msg += ' ' + str(arg)
         self.logger.warning(msg)
 
-    def error(self, msg):
+    def error(self, msg, *args):
+        for arg in args:
+            msg += ' ' + str(arg)
         self.logger.error(msg)
 
 

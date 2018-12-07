@@ -1,27 +1,33 @@
 from ctypes import *
 import cv2
 import numpy as np
-from logger import Log
+from util.logger import Log
+from rest.error import CAM_INIT_ERR, CAM_GRAB_ERR
 import time
 import os
-# initErr:
-#       0:      success
-#       -1      network init error
-#       -2      couldn't open url
-#       -3      has no video stream
-#       -4      find video stream error
-#       -5      find decoder error
-#       -6      parse codec error
-#       -7      malloc stream context error
-#       -8      copy codec params error
-#       -9      open codec error
-#       -10     find video frame error
 
 class Grab():
     def __init__(self, url, rate, use_gpu = False):
+        '''
+        # initErr:
+        #       0:      success
+        #       -1      network init error
+        #       -2      couldn't open url
+        #       -3      has no video stream
+        #       -4      find video stream error
+        #       -5      find decoder error
+        #       -6      parse codec error
+        #       -7      malloc stream context error
+        #       -8      copy codec params error
+        #       -9      open codec error
+        #       -10     find video frame error
+        :param url:
+        :param rate:
+        :param use_gpu:
+        '''
         self.url = url
         self.rate = rate
-        self.ffmpegPython = cdll.LoadLibrary('../linux-build-cmake-make/ffmpeg-python.so')
+        self.ffmpegPython = cdll.LoadLibrary('./linux-build-cmake-make/ffmpeg-python.so')
         self.ffmpegPython.init.argtypes = [c_char_p, c_bool, c_bool, POINTER(c_int), POINTER(c_int)]
         self.ffmpegPython.init.restype = c_int
         self.logger = Log('grab', is_save=False)
@@ -39,20 +45,8 @@ class Grab():
             self.height = height.value
             self.logger.info('grab initialize success!')
         else:
-            error_msg = {
-                -1: 'network init error',
-                -2: 'could not open url',
-                -3: 'has no video stream',
-                -4: 'find video stream error',
-                -5: 'find decoder error',
-                -6: 'parse codec error',
-                -7: 'malloc stream context error',
-                -8: 'copy codec params error',
-                -9: 'open codec error',
-                -10: 'find video frame error'
-            }
             try:
-                e = error_msg[self.initErr]
+                e = CAM_INIT_ERR[self.initErr]
                 self.logger.warning('grab initialize failed, error_message: ' + e)
             except KeyError:
                 self.logger.warning('grab initialize failed, unknown error')
@@ -97,36 +91,25 @@ class Grab():
             img = img.reshape(self.height, self.width , 3)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             self.logger.info('grab success, size = %d' % size.value)
-            self.release(tmp_buf)
+            self.__release(tmp_buf)
             return img
         else:
-            error_msg = {
-                -1: 'malloc frame error',
-                -2: 'malloc packet error',
-                -3: 'has no video stream',
-                -4: 'decode packet error',
-                -5: 'decode frame error',
-                -6: 'data is null, network may be error',
-                -10: 'malloc new frame error',
-                -20: 'malloc new frame error',
-                -30: 'not init error'
-            }
             try:
-                e = error_msg[error.value]
+                e = CAM_GRAB_ERR[error.value]
                 self.logger.warning('grab failed , error message: ' + e)
             except KeyError:
                 self.logger.error('grab failed, unknown error!')
             finally:
                 return None
 
-    def release(self, tmp_buf):
+    def __release(self, tmp_buf):
         self.ffmpegPython.freeImageBuffer(tmp_buf)
 
     def close(self):
         self.ffmpegPython.destroy()
 
 def test(id):
-    grab = Grab('rtsp://admin:iec123456@192.168.1.72:554/unicast/c1/s0/live', 5, 1)
+    grab = Grab('rtsp://admin:iec123456@192.168.1.72:554/unicast/c1/s0/live', 5)
     while True:
         img = grab.grab_image()
         if img is not None:
