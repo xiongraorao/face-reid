@@ -100,7 +100,7 @@ def add():
     '''
     start = time.time()
     data = request.data.decode('utf-8')
-    nessary_params = {'url'}
+    necessary_params = {'url'}
     default_params = {'rate': 1, 'grab': 1, 'name': 'Default Camera'}
     ret = {'time_used': 0, 'rtn': -1, 'id': 'null'}
     # 检查json 格式
@@ -110,7 +110,7 @@ def add():
         logger.warning(GLOBAL_ERR['json_syntax_err'])
         ret['message'] = GLOBAL_ERR['json_syntax_err']
         return json.dumps(ret)
-    legal = check_param(set(data), nessary_params, set(default_params))
+    legal = check_param(set(data), necessary_params, set(default_params))
     if not legal:
         logger.warning(GLOBAL_ERR['param_err'])
         ret['message'] = GLOBAL_ERR['param_err']
