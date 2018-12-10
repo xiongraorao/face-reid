@@ -6,8 +6,8 @@ CREATE TABLE IF NOT EXISTS `t_camera`(
   `rate` INT DEFAULT 1 COMMENT '抓帧频率',
   `grab` INT DEFAULT 1 COMMENT '0表示不开启抓图，1表示开启抓图',
   `state` INT DEFAULT 1 COMMENT '摄像头状态',
-  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `update_time` timestamp NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
+  `create_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
 );
 
 
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS `t_cluster`(
   `id` INT PRIMARY KEY AUTO_INCREMENT COMMENT '人脸特征的索引ID, 样本ID',
   `cluster_id` INT NOT NULL COMMENT '动态库聚类的ID',
   `uri` VARCHAR(100) NOT NULL COMMENT '抓拍人员的URI',
-  `timestamp` DATE NOT NULL COMMENT '抓拍时间',
+  `timestamp` TIMESTAMP NOT NULL COMMENT '抓拍时间',
   `camera_id` INT NOT NULL COMMENT '抓拍摄像头的ID'
 );
 CREATE INDEX cluster ON `t_cluster`(cluster_id); # 给动态库的cluster创建索引, 用于轨迹查询
@@ -81,3 +81,9 @@ CREATE TABLE IF NOT EXISTS `t_peer`(
   `src_img` VARCHAR(100) COMMENT '目标人图片的URL',
   `sample_id` INT COMMENT '同行人的ID（sample_id)'
 );
+
+# test
+CREATE TABLE `t_test`(
+  `id` INT PRIMARY KEY AUTO_INCREMENT,
+  `time` DATETIME
+)

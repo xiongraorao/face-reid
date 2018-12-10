@@ -31,7 +31,7 @@ class Kafka:
         '''
         self.client.delete_topics(topic_names)
 
-    def produce(self, topic_name, msg):
+    def send(self, topic_name, msg):
         '''
         produce message to this topic
         :param topic_name: topic name
@@ -41,7 +41,7 @@ class Kafka:
         '''
         self.producer.send(topic_name, msg.encode('utf-8'))
 
-    def consume(self, topic_names, group_id = None):
+    def get_consumer(self, topic_names, group_id = None):
         '''
         a list of topics for subscription
         :param topic_names:
@@ -63,7 +63,7 @@ if __name__ == '__main__':
     kafka = Kafka(bootstrap_servers='192.168.1.6:19092')
     topics = ['test1', 'test2']
     topics = ['grab_image']
-    consumer = kafka.consume(topics, group_id='test')
+    consumer = kafka.get_consumer(topics, group_id='test')
     # for message in consumer:
     #     print("%s:%d:%d: key=%s value=%s" % (message.topic, message.partition,
     #                                     message.offset, message.key,

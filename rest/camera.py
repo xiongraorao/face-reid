@@ -13,6 +13,7 @@ from util.logger import Log
 from util.mykafka import Kafka
 from util.mysql import Mysql
 from util.seaweed import WeedVolume, WeedMaster
+from util.face import Face, mat_to_base64
 
 logger = Log('camera', 'logs/')
 config = configparser.ConfigParser()
@@ -65,24 +66,31 @@ def grab_proc(url, rate, camera_id, logger):
     # job = GrabJob(grab=g, queue=q)
     # job.start()
     count = 0
+    face_tool = Face(config.get('api','face_server'))
     while True:
         img = g.grab_image()
-        timestamp = time.time()
         if img is not None:
-            # save img to seaweed fs
-            assign = master.assign()
-            logger.debug('assign result:', assign)
-            bs = cv2.imencode('.jpg', img)
-            ret = volume.upload(assign['fid'], bs[1], assign['fid'] + '.jpg')
-            logger.info('upload result:', ret)
+            # 检测人脸, 启用跟踪模式
+            b64 = mat_to_base64(img)
+            face = face_tool.detect(b64, field='track', camera_id=str(camera_id))
+            for num in range(face['track_nums']):
+                croped_face = face_tool.crop(face['track'][num]['left'], face['track'][num]['top'],
+                                       face['track'][num]['width'],face['track'][num]['height'],img)
 
-            # send to Kafka
-            url = 'http' + ':' + '//' + assign['url'] + '/' + assign['fid']
-            logger.debug('[', camera_id, ']', 'img url:', url)
-            msg = json.dumps({'url': url, 'time': timestamp, 'camera': camera_id})
-            logger.debug('send to kafka: ', msg)
-            kafka.produce(topic, msg)
-            count = 0
+                # save img to seaweed fs
+                assign = master.assign()
+                logger.debug('assign result:', assign)
+                bs = cv2.imencode('.jpg', croped_face)
+                ret = volume.upload(assign['fid'], bs[1], assign['fid'] + '.jpg')
+                logger.info('upload result:', ret)
+
+                # send to Kafka
+                url = 'http' + ':' + '//' + assign['url'] + '/' + assign['fid']
+                logger.debug('[', camera_id, ']', 'img url:', url)
+                msg = json.dumps({'url': url, 'time': face['track'][num]['bestTime'], 'camera_id': camera_id, 'landmark': face['track'][num]['landmark']})
+                logger.debug('send to kafka: ', msg)
+                kafka.send(topic, msg)
+                count = 0
         else:
             count += 1
             if count > 50:  # 连续50帧抓不到图，则释放资源

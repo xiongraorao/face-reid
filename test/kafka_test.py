@@ -47,8 +47,8 @@ if __name__ == '__main__':
     #kafka.create_topics([('test1', 3, 3), ('test2', 3, 3)])
     import time
     for i in range(200):
-        kafka.produce('test1', 'test1 message: ' + str(i*4))
-        kafka.produce('test2', 'test2 message: ' + str(i*2))
+        kafka.send('test1', 'test1 message: ' + str(i * 4))
+        kafka.send('test2', 'test2 message: ' + str(i * 2))
         print('send: ', i)
         time.sleep(1)
 

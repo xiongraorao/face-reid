@@ -1,7 +1,7 @@
 import pymysql
 
 class Mysql():
-    def __init__(self, host, port, user, password, db, charset='utf-8'):
+    def __init__(self, host, port, user, password, db, charset='utf8'):
         '''
         数据库连接初始化
         :param host:
