@@ -67,7 +67,12 @@ def search():
         p.start()
         proc_pool[query_id] = p
     else:
-        sql = "select `cluster_id`, `face_image_uri`, `similarity` from `t_search` where `query_id` = %s order by `similarity` desc"
+        sql = "select `cluster_id`, `face_image_uri`, `similarity` from `t_search` where `query_id` = %s  order by `similarity` desc limit %s,%s"
+        result = db.select(sql, (data['query_id'], data['start_pos'], data['limit']))
+        for item in result:
+            pass
+            # todo return search result
+
 
 
 @search.route('/status', methods=['GET'])
