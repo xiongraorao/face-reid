@@ -1,8 +1,10 @@
 '''
 程序入口
 '''
+import base64
 import configparser
 import json
+import uuid
 
 import cv2
 import numpy as np
@@ -15,6 +17,7 @@ from util.logger import Log
 from util.mykafka import Kafka
 from util.mysql import Mysql
 from util.search import Search
+from util.face import bytes_to_base64
 
 logger = Log('index', 'logs/')
 config = configparser.ConfigParser()
@@ -22,10 +25,14 @@ config.read('./app.config')
 
 
 def download(url):
+    '''
+    download image as base64
+    :param url:
+    :return:
+    '''
     content = requests.get(url).content
-    ret = cv2.imdecode(np.fromstring(content, np.uint8), cv2.IMREAD_COLOR)
-    return ret
-
+    b64 = bytes_to_base64(content)
+    return b64
 
 def process():
     # 1.从kafka消费消息
@@ -40,21 +47,21 @@ def process():
     topics = config.get('camera', 'topic')
     consumer = kafka.get_consumer(topics, 'default')
     face = Face(config.get('api', 'face_server'))
-    cluster_id = 0
     for msg in consumer:
         logger.info('get msg: ', msg)
-        msg = json.loads(msg.value.decode('utf-8'))
+        msg = msg.value
         start = round(time.time())
         msg = json.loads(msg)
-        img = download(msg['url'])
-        b64 = mat_to_base64(img)
+        b64 = download(msg['url'])
         landmark = msg['landmark']
-        feature = face.extract(b64, landmark)
+        feature = face.extract([b64], [landmark])
+        print(feature)
+        feature = feature['feature'][0]
 
         # 1. 添加数据库，获取sample_id
-
+        cluster_id = hash(uuid.uuid4())
         sql = "insert into `t_cluster` (`cluster_id`, `uri`, `timestamp`, `camera_id`) values (%s, %s, %s, %s)"
-        sample_id = db.insert(sql, (cluster_id, msg['url'], time_to_date(msg['time']), msg['camera_id']))
+        sample_id = db.insert(sql, (cluster_id, msg['url'], time_to_date(int(msg['time'])), msg['camera_id']))
         if sample_id == -1:
             logger.info('sample insert failed, mysql maybe not available')
             continue
@@ -62,16 +69,18 @@ def process():
 
         # 2. 添加特征到索引中
         searcher = Search(config.get('api', 'search_host'), config.getint('api', 'search_port'))
+        print('dim: ', len(feature))
         ret = searcher.add([sample_id], [feature])
         logger.info('index add:', ret)
 
         # 3. 进行预分类
         s_res = searcher.search(1, [feature])
-        sim = s_res['result'][0]['distance'][0]
-        label = s_res['result'][0]['label'][0]
+        print('search result', s_res)
+        sim = s_res['result']['0']['distance'][0]
+        label = s_res['result']['0']['labels'][0]
         if sim > 0.75:
             # 合并成一个类
-            sql = "update `t_cluster` set `cluster_id` = (select cluster_id from `t_cluster` where id = %s) where id = %s"
+            sql = "update `t_cluster` as a inner join `t_cluster` as b on a.id = %s and b.id = %s set b.cluster_id = a.cluster_id"
             ret = db.update(sql, (label, sample_id))
             if ret:
                 db.commit()
@@ -80,7 +89,8 @@ def process():
                 logger.info('sample update failed, mysql maybe not available')
         else:
             # 新建一个类
-            cluster_id += 1  # 更新cluster_id 下次使用
+            pass
+
         lantency = round(time.time()) - start
         logger.info('process lantency:', lantency)
 

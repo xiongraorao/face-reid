@@ -3,17 +3,16 @@ import json
 import multiprocessing as mp
 import time
 
-import cv2
 from flask import Blueprint, request
 
 from rest.error import *
 from rest.http_util import check_param, update_param
+from util.face import Face, mat_to_base64, base64_to_bytes
 from util.grab import Grab
 from util.logger import Log
 from util.mykafka import Kafka
 from util.mysql import Mysql
 from util.seaweed import WeedVolume, WeedMaster
-from util.face import Face, mat_to_base64
 
 logger = Log('camera', 'logs/')
 config = configparser.ConfigParser()
@@ -30,7 +29,6 @@ db.set_logger(logger)
 camera = Blueprint('camera', __name__)
 
 proc_pool = {}
-
 
 def grab_proc(url, rate, camera_id, logger):
     '''
@@ -74,21 +72,28 @@ def grab_proc(url, rate, camera_id, logger):
             b64 = mat_to_base64(img)
             face = face_tool.detect(b64, field='track', camera_id=str(camera_id))
             for num in range(face['track_nums']):
-                croped_face = face_tool.crop(face['track'][num]['left'], face['track'][num]['top'],
-                                       face['track'][num]['width'],face['track'][num]['height'],img)
+                logger.info('track person success! num = %d' % num)
+                face_b64 = face['track'][num]['image_base64']
+
+                # mat = base64_to_mat(detect_face)
+                # cv2.imwrite(str(uuid.uuid4())+'.jpg', mat)
+                # logger.info('detect_face: ', detect_face)
 
                 # save img to seaweed fs
+                logger.info('save grabbed face to seaweed fs')
                 assign = master.assign()
-                logger.debug('assign result:', assign)
-                bs = cv2.imencode('.jpg', croped_face)
-                ret = volume.upload(assign['fid'], bs[1], assign['fid'] + '.jpg')
+                logger.info('assign result:', assign)
+                # bs = cv2.imencode('.jpg', detect_face)
+
+                ret = volume.upload(assign['fid'], base64_to_bytes(face_b64), assign['fid'] + '.jpg')
                 logger.info('upload result:', ret)
 
                 # send to Kafka
                 url = 'http' + ':' + '//' + assign['url'] + '/' + assign['fid']
-                logger.debug('[', camera_id, ']', 'img url:', url)
-                msg = json.dumps({'url': url, 'time': face['track'][num]['bestTime'], 'camera_id': camera_id, 'landmark': face['track'][num]['landmark']})
-                logger.debug('send to kafka: ', msg)
+                logger.info('[', camera_id, ']', 'img url:', url)
+                msg = json.dumps({'url': url, 'time': int(face['track'][num]['bestTime']), 'camera_id': camera_id,
+                                  'landmark': face['track'][num]['landmark']})
+                logger.info('send to kafka: ', msg)
                 kafka.send(topic, msg)
                 count = 0
         else:

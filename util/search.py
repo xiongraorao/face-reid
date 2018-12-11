@@ -20,17 +20,17 @@ class Search():
         '''
         url = 'http://' + self.host + ':' + str(self.port) + '/add'
         print(url)
-        n = vectors.shape[0]
+        n = len(vectors)
         if len(ids) != n:
             print('parameters error!')
             return
         data = {}
         for i in range(n):
-            data[ids[i]] = vectors[i, :]
+            data[ids[i]] = vectors[i]
         data_request = {'ntotal': n, 'data': data}
         response = requests.post(url, data=json.dumps(data_request), headers=headers)
         text = response.json()
-        return json.loads(text)
+        return text
 
     def search(self, topk, queries):
         '''
@@ -41,14 +41,15 @@ class Search():
         :return: queriers * topk 的二维数组
         '''
         url = 'http://' + self.host + ':' + str(self.port) + '/search'
-        qtotal = queries.shape[0]
+        qtotal = len(queries)
         q = {}
         for i in range(qtotal):
-            q[i] = queries[i, :]
+            q[i] = queries[i]
         data_request = {'qtotal': qtotal, 'topk': topk, 'queries': q}
         response = requests.post(url, data=json.dumps(data_request), headers=headers)
+        print(response)
         text = response.json()
-        return json.loads(text)
+        return text
 
     def delete(self, ids):
         '''

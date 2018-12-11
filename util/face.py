@@ -1,13 +1,11 @@
 import base64
 import json
 import os
-import requests
+
 import cv2
 import numpy as np
 import zmq
-#from .logger import Log
 
-#logger = Log('face', 'logs/')
 
 class Face:
     def __init__(self, url):
@@ -18,7 +16,6 @@ class Face:
         context = zmq.Context()
         self.socket = context.socket(zmq.DEALER)
         self.socket.connect(url)
-        #logger.info('face api initialized completed')
 
     def detect(self, image_base64, field = None, image_id = None, camera_id = None):
         '''
@@ -45,10 +42,12 @@ class Face:
         '''
         提取人脸特征
         :param image_base64: 图片的base64位编码
+        :type list
         :param landmarks: detect接口返回的人脸位置信息
+        :type list
         :return:
         '''
-        data = {'interface': '6', 'api_key': '', 'image_base64': base64, 'landmarks': landmarks}
+        data = {'interface': '6', 'api_key': '', 'image_base64': image_base64, 'landmarks': landmarks}
 
         data = json.dumps(data)
         self.socket.send_string(data)
@@ -84,59 +83,6 @@ def get_list_files(path):
         for filespath in files:
             ret.append(os.path.join(root, filespath))
     return ret
-
-
-# def extract(base64):
-#     '''
-#     提取人脸
-#     {'status': 0, 'message': '成功获取到人脸特征', 'data': [0.02387029491364956, ..., 0.053947705775499344]}
-#     :param base64:
-#     :return:
-#     '''
-#     data_request = {'image_base64': base64}
-#     url = 'http://192.168.1.11:2313/faces/feature'
-#     headers = {'content-type': "application/json"}
-#     response = requests.post(url, data=json.dumps(data_request), headers=headers)
-#     text = json.loads(response.text)
-#     if text['status'] == 0:
-#         return text['data']
-#     else:
-#         return None
-#
-#
-# def detect(base64):
-#     """
-#     {'status': 0, 'message': '成功检测到人脸', 'data': [{'glasses': 0, 'height': 332, 'landmark': {'x': [69, 139, 108, 78, 137],
-#      'y': [144, 140, 181, 226, 224]}, 'left': 190, 'quality': 1, 'score': 0.9997692704200745, 'sideFace': 0, 'top': 66, 'width': 208}]}
-#     :param base64:
-#     :return:
-#     """
-#     data_request = {'image_base64': base64}
-#     url = 'http://192.168.1.11:2313/faces/detect'
-#     headers = {'content-type': "application/json"}
-#     response = requests.post(url, data=json.dumps(data_request), headers=headers)
-#     text = json.loads(response.text)
-#     #print(text)
-#     if text['status'] == 0:
-#         face = Face()
-#         data = text['data'][0]
-#         face.x = data['left']
-#         face.y = data['top']
-#         face.width = data['width']
-#         face.height = data['height']
-#         face.sideFace = data['sideFace']
-#         face.quality = data['quality']
-#         face.score = data['score']
-#         return face
-#     else:
-#         return None
-#
-#
-# def extract2(file_path):
-#     f = open(file_path, 'rb')
-#     b64 = base64.b64encode(f.read())
-#     return extract(b64)
-
 
 def cosine(x, y):
     """
@@ -214,6 +160,26 @@ def base64_to_mat(b64):
     img_np = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     return img_np
 
+
+def base64_to_bytes(b64):
+    '''
+    base64 解码成bytes 数组
+    :param b64:
+    :return:
+    '''
+    bys = base64.b64decode(b64)
+    return bys
+
+
+def bytes_to_base64(bys):
+    '''
+    bytes数组编码成base64 字符串
+    :param bys:
+    :return:
+    '''
+    b64 = base64.b64encode(bys).decode('utf-8')
+    return b64
+
 def face_feature(base64):
     '''
     获取当前图片中所有的人脸信息以及对应的特征
@@ -249,61 +215,3 @@ def face_feature(base64):
     ret['detect_info'] = detect_infos
     ret['feature'] = features
     return ret
-
-if __name__ == '__main__':
-
-    face = Face('tcp://192.168.1.11:5559')
-    capture = cv2.VideoCapture(0)
-    count = 0
-    f = open('./result.txt','w')
-    while True:
-        ret, img = capture.read()
-        count += 1
-        if ret:
-            image = cv2.imencode('.jpg', img)[1]
-            b64 = str(base64.b64encode(image))[2:-1]
-            result = face.detect(b64,field='track', image_id=str(count), camera_id='1')
-            # result = face.detect(b64)
-            for num in range(result['detect_nums']):
-                print(num, ':', result['detect'][num])
-                left = result['detect'][num]['left']
-                top = result['detect'][num]['top']
-                height = result['detect'][num]['height']
-                width = result['detect'][num]['width']
-                crop = face.crop(left,top, width, height,img)
-                # cv2.imwrite('F:\\camera\\tt\\%s.jpg' % (str(count) + str(num)), crop)
-                cv2.imshow('img', crop)
-                # cv2.waitKey(1000)
-                if 0xFF & cv2.waitKey(5) == 27:
-                    break
-
-    img = open('F:\\02.jpg', 'rb')
-    b64 = base64.b64encode(img.read()).decode('utf-8')
-    data = {'interface': '5', 'api_key': '', 'image_base64': b64}
-    ret = face.detect(data)
-    print(ret)
-
-    img = open('F:\\02.jpg', 'rb')
-    b64 = base64.b64encode(img.read()).decode('utf-8')
-
-    # test for face_feature
-    ret = face_feature(b64)
-    print("len: ", len(ret['detect_info']), len(ret['feature']))
-    #feature = extract(b64)
-    zmq_d_result = json.loads(zmq_detect(b64))
-    landmarks = zmq_d_result['detect'][0]['landmark']
-    f = detect(b64)
-    h_f = np.array(extract(b64))
-    # crop
-    img = cv2.imread('F:\\01.jpg')
-    crop_img = img[f.y:f.y + f.height, f.x:f.x + f.width]
-    crop_b64 = mat_to_base64(crop_img)
-    z_f = zmq_extract(crop_b64, landmarks)
-    z_f = json.loads(z_f)['feature'][0]
-    z_f = np.array(z_f)
-    print('sim: ', h_f.dot(z_f))
-    cv2.imshow('t', crop_img)
-    while True:
-        if cv2.waitKey(5) == 27:
-            break
-    print()

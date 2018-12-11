@@ -49,11 +49,13 @@ CREATE TABLE IF NOT EXISTS `t_person`(
 
 # search 查询结果
 CREATE TABLE IF NOT EXISTS `t_search`(
-  `query_id` INT PRIMARY KEY AUTO_INCREMENT COMMENT 'query task id',
+  `id` INT PRIMARY KEY AUTO_INCREMENT,
   `total` INT COMMENT 'total result count',
   `cluster_id` VARCHAR(100) COMMENT '待查对象所属的类ID',
   `face_image_uri` VARCHAR(100) COMMENT '类锚点人脸图的URI',
-  `similarity` FLOAT COMMENT '相似度'
+  `similarity` FLOAT COMMENT '相似度',
+  `query_id` INT COMMENT 'query_id, 用于找到结果',
+  `time` TIMESTAMP COMMENT '任务启动的时间'
 );
 
 # trace 轨迹查询结果，速度够快的话，可以不用存结果到数据库

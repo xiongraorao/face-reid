@@ -60,11 +60,23 @@ def search():
     logger.info('parameters:', data)
 
     # 1. 启动查询进程，将查询结果放到数据库中
-    query_id = data['query_id']
     if data['query_id'] == -1: #第一次查询，启动查询进程
-        #p = mp.Process(target=search_proc, args=(data, logger))
-        # p.daemon = True
-        # p.start()
-        # proc_pool[data[]]
+        query_id = round(time.time())
+        p = mp.Process(target=search_proc, args=(data, logger))
+        p.daemon = True
+        p.start()
+        proc_pool[query_id] = p
+    else:
+        sql = "select `cluster_id`, `face_image_uri`, `similarity` from `t_search` where `query_id` = %s order by `similarity` desc"
+
+
+@search.route('/status', methods=['GET'])
+def status1():
+    '''
+    人脸搜索异步返回的状态
+    :return:
+    '''
+    start = time.time()
+
 
 
