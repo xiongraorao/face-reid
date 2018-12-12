@@ -46,7 +46,7 @@ def process():
     db.set_logger(logger)
     topics = config.get('camera', 'topic')
     consumer = kafka.get_consumer(topics, 'default')
-    face = Face(config.get('api', 'face_server'))
+    face_tool = Face(config.get('api', 'face_server'))
     for msg in consumer:
         logger.info('get msg: ', msg)
         msg = msg.value
@@ -54,7 +54,7 @@ def process():
         msg = json.loads(msg)
         b64 = download(msg['url'])
         landmark = msg['landmark']
-        feature = face.extract([b64], [landmark])
+        feature = face_tool.extract([b64], [landmark])
         print(feature)
         feature = feature['feature'][0]
 

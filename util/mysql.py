@@ -111,7 +111,7 @@ class Mysql():
                 self.logger.error('MySQL error! roll back ...')
             self.rollback()
             cursor.close()
-            return [[]]
+            return None
 
     def truncate(self, table_name):
         sql = 'truncate t_camera'

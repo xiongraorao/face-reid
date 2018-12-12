@@ -25,8 +25,8 @@ CREATE INDEX cluster ON `t_cluster`(cluster_id); # 给动态库的cluster创建�
 CREATE TABLE IF NOT EXISTS `t_contact`(
   `id` INT PRIMARY KEY AUTO_INCREMENT COMMENT '人员ID，用于和动态库关联',
   `cluster_id` VARCHAR(100) NOT NULL COMMENT '动态库的类ID',
-  `repository_id` INT COMMENT '人像库ID',
-  `person_id` VARCHAR(100) COMMENT '人员ID',
+  `repository_id` INT UNIQUE COMMENT '人像库ID',
+  `person_id` VARCHAR(100) COMMENT '人员ID(名字)',
   FOREIGN KEY (id) REFERENCES `t_person`(`id`) ON UPDATE CASCADE ON DELETE CASCADE,
   FOREIGN KEY (repository_id) REFERENCES `t_lib`(`repository_id`) ON UPDATE CASCADE ON DELETE CASCADE
 );

@@ -54,7 +54,7 @@ class Face:
         message = self.socket.recv_string()[:-2]
         return json.loads(message)
 
-    def crop(self, left, top, width, height, origin_img):
+    def crop(self, left, top, width, height, origin_img, b64 = False):
         '''
         图片裁剪
         :param left:
@@ -62,8 +62,11 @@ class Face:
         :param width:
         :param height:
         :param origin_img: 原图
+        :param b64 : 原图数据格式，默认False为numpy数组，True为b64编码
         :return:
         '''
+        if b64:
+            origin_img = base64_to_mat(origin_img)
         # 坐标修正
         origin_h, origin_w = origin_img.shape[:-1]
         left = 0 if left < 0 else left
@@ -71,6 +74,8 @@ class Face:
         width = origin_w - left - 1 if left + width > origin_w else width
         height = origin_h - top - 1 if top + height > origin_h else height
         crop_img = origin_img[top:top+height, left:left+width]
+        if b64:
+            crop_img = mat_to_base64(crop_img)
         return crop_img
 
     def close(self):

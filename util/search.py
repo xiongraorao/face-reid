@@ -107,3 +107,49 @@ class Search():
         text = response.json()  # json.loads(response.text)
         # print(text)
         return text
+
+class Faiss():
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
+
+    def add(self, ntotal, ids, vectors):
+        '''
+        添加向量到索引
+        :param ntotal: 向量个数
+        :param ids: 特征向量的id list
+        :type list
+        :param vectors: 特征向量的list
+        :type list[list]
+        :return:
+        '''
+        url = 'http://' + self.host + ':' + str(self.port) + '/add'
+        data_request = {'ntotal': ntotal, 'data': {'ids': ids, 'vectors': vectors}}
+        response = requests.post(url, data=json.dumps(data_request), headers=headers)
+        return response.json()
+
+    def search(self, qtotal, topk, queries):
+        '''
+        查询向量
+        :param qtotal: 查询的向量个数
+        :param topk: 查询topk个相似的向量
+        :param queries: 查询向量的list
+        :type list[list]
+        :return:
+        '''
+        url = 'http://' + self.host + ':' + str(self.port) + '/search'
+        data_request = {'qtotal':qtotal, 'topk': topk, 'queries': queries}
+        response = requests.post(url, data=json.dumps(data_request), headers=headers)
+        return response.json()
+
+    def delete(self, ids):
+        '''
+        删除向量
+        :param ids: 待删除向量的id 列表
+        :type list
+        :return:
+        '''
+        url = 'http://' + self.host + ':' + str(self.port) + '/del'
+        data_request = {'ids': ids}
+        response = requests.post(url, data=json.dumps(data_request), headers=headers)
+        return response.json()

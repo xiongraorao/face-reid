@@ -4,8 +4,14 @@ GLOBAL_ERR = {
 }
 
 CAM_ERR = {
-    'success': 'camera operation success',
+    'success': 'camera operation succeeded',
     'fail': 'camera operation failed'
+}
+
+SEARCH_ERR = {
+    'start': 'search process has started',
+    'success': 'search operation succeeded',
+    'fail': 'search operation failed'
 }
 
 CAM_INIT_ERR = {
