@@ -28,7 +28,7 @@ class Mysql():
 
     def insert(self, sql, args=None):
         '''
-        插入操作，返回对象自动生成的ID
+        插入操作，返回对象自动生成的ID, 如果是多条插入，则返回的是第一条数据插入时候的auto generated id
         :param sql:
         :param args:
         :return:
@@ -57,7 +57,6 @@ class Mysql():
 
     def close(self):
         self.connection.close()
-
 
     def delete(self, sql, args=None):
         '''

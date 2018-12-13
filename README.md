@@ -11,3 +11,10 @@ pip install -r requirements.txt
 python demo.py
 python visualize.py
 ```
+
+# API 文档
+
+[API文档](doc/api.md)
+
+# 简介
+

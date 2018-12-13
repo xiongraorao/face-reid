@@ -119,10 +119,8 @@ def zmq_detect(base64):
     data = {'interface': '5', 'api_key': '', 'image_base64': base64}
     data = json.dumps(data)
     socket.send_string(data)
-    message = socket.recv()
-    r = message[:-2].decode('utf-8')
-    # print('zmq detect received message: ', r)
-    return r
+    message = socket.recv_string()[:-2]
+    return message
 
 def zmq_extract(base64, landmarks):
     '''
@@ -140,10 +138,8 @@ def zmq_extract(base64, landmarks):
     data = json.dumps(data)
     #socket.send_string(data)
     socket.send_json(data)
-    message = socket.recv()
-    r = message[:-2].decode('utf-8')
-    # print('zmq extract feature: ', r)
-    return r
+    message = socket.recv_string()[:-2]
+    return message
 
 def mat_to_base64(img_np):
     '''

@@ -23,12 +23,12 @@ CREATE INDEX cluster ON `t_cluster`(cluster_id); # 给动态库的cluster创建�
 
 # 动态cluster 和 静态库的关联
 CREATE TABLE IF NOT EXISTS `t_contact`(
-  `id` INT PRIMARY KEY AUTO_INCREMENT COMMENT '人员ID，用于和动态库关联',
+  `id` INT PRIMARY KEY COMMENT 'person_id，用于和动态库关联',
   `cluster_id` VARCHAR(100) NOT NULL COMMENT '动态库的类ID',
-  `repository_id` INT UNIQUE COMMENT '人像库ID',
-  `person_id` VARCHAR(100) COMMENT '人员ID(名字)',
-  FOREIGN KEY (id) REFERENCES `t_person`(`id`) ON UPDATE CASCADE ON DELETE CASCADE,
-  FOREIGN KEY (repository_id) REFERENCES `t_lib`(`repository_id`) ON UPDATE CASCADE ON DELETE CASCADE
+#   `repository_id` INT UNIQUE COMMENT '人像库ID',
+#   `person_id` VARCHAR(100) COMMENT '人员ID(名字)',
+  FOREIGN KEY (id) REFERENCES `t_person`(`id`) ON UPDATE CASCADE ON DELETE CASCADE
+#   FOREIGN KEY (repository_id) REFERENCES `t_lib`(`repository_id`) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 # 静态库表
@@ -39,8 +39,8 @@ CREATE TABLE IF NOT EXISTS `t_lib`(
 
 # 静态库成员表
 CREATE TABLE IF NOT EXISTS `t_person`(
-  `id` INT PRIMARY KEY AUTO_INCREMENT COMMENT '用于和动态库关联',
-  `person_id` VARCHAR(100) NOT NULL COMMENT '人员ID(名字)',
+  `id` INT PRIMARY KEY AUTO_INCREMENT COMMENT 'person_id',
+  `name` VARCHAR(100) NOT NULL COMMENT '人员名字',
   `uri` VARCHAR(100) NOT NULL COMMENT '人员图片路径',
   `repository_id` INT NOT NULL COMMENT '人像库ID',
   FOREIGN KEY (`repository_id`)REFERENCES `t_lib`(`repository_id`)
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS `t_person`(
 # search 查询结果
 CREATE TABLE IF NOT EXISTS `t_search`(
   `id` INT PRIMARY KEY AUTO_INCREMENT,
-  `total` INT COMMENT 'total result count',
+#   `total` INT COMMENT 'total result count',
   `cluster_id` VARCHAR(100) COMMENT '待查对象所属的类ID',
   `face_image_uri` VARCHAR(100) COMMENT '类锚点人脸图的URI',
   `similarity` FLOAT COMMENT '相似度',

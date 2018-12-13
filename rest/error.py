@@ -11,7 +11,9 @@ CAM_ERR = {
 SEARCH_ERR = {
     'start': 'search process has started',
     'success': 'search operation succeeded',
-    'fail': 'search operation failed'
+    'fail': 'search operation failed',
+    'query_not_exist': 'query task id is not exist',
+    'query_in_progress': 'query task is in progress'
 }
 
 CAM_INIT_ERR = {

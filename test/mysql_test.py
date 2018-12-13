@@ -28,11 +28,15 @@ db.set_logger(logger)
 # print(data[0][0])
 
 if __name__ == '__main__':
-    print('asdf')
-    items = [2,5]
-    print(tuple(items))
-    sql = "select url from `t_camera` where id in {}".format(str(tuple(items)))
-    ret = db.select(sql)
+    # print('asdf')
+    # items = [2,5]
+    # print(tuple(items))
+    # sql = "select url from `t_camera` where id in {}".format(str(tuple(items)))
+    # ret = db.select(sql)
+    # print(ret)
+    # print(len(ret))
+    sql = "insert into `t_camera` (name, url) values ('name1', 'url1'), ('name2', 'url2')"
+    ret = db.insert(sql)
+    db.commit()
     print(ret)
-    print(len(ret))
 
