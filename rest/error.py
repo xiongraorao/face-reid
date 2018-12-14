@@ -13,7 +13,8 @@ SEARCH_ERR = {
     'success': 'search operation succeeded',
     'fail': 'search operation failed',
     'query_not_exist': 'query task id is not exist',
-    'query_in_progress': 'query task is in progress'
+    'query_in_progress': 'query task is in progress',
+    'null': 'search result is null'
 }
 
 CAM_INIT_ERR = {

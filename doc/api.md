@@ -146,7 +146,7 @@
 | results.cluster_id | `string` | 目标属于的类别ID
 | results.face_image_uri | `string` | 该类的锚点人脸图
 | results.similarity | `float` | 目标和该类的所有人脸的平均相似度
-| results.repository_info | `object` | 关联到的静态库信息
+| results.repository_infos | `Array<object>` | 关联到的静态库信息
 | results.repository_info.person_id | `string` | 人员id
 | results.repository_info.repository_id | `string` | 人像库id
 | results.repository_info.name | `string` | 人像库名称

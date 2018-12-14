@@ -78,6 +78,30 @@ class Face:
             crop_img = mat_to_base64(crop_img)
         return crop_img
 
+    def feature(self, image_base64, isPortrait = True):
+        '''
+        直接检测人脸，对第一张人脸提取特征，通常用于单张人脸的图片
+        :param image_base64:
+        :return:
+        '''
+        field = None
+        if isPortrait:
+            field = 'portrait'
+        detect_result = self.detect(image_base64, field)
+        if detect_result['error_message'] != 601 or detect_result['detect_nums'] == 0:
+            return None
+        left = detect_result['detect'][0]['left']
+        top = detect_result['detect'][0]['top']
+        width = detect_result['detect'][0]['width']
+        height = detect_result['detect'][0]['height']
+        cropped_img = self.crop(left,top, width, height, image_base64, True)
+        landmark = detect_result['detect'][0]['landmark']
+        extract_result = self.extract([cropped_img], [landmark])
+        if extract_result['error_message'] != 701:
+            return None
+        feature = extract_result['feature']
+        return feature
+
     def close(self):
         self.socket.close()
 

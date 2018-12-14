@@ -40,16 +40,9 @@ def search_proc(data, logger, query_id, start_time):
     # 1. 从索引接口中查询数据
     searcher = Faiss(config.get('api', 'faiss_host'), config.getint('api', 'faiss_port'))
     face_tool = Face(config.get('api', 'face_server'))
-    detect_result = face_tool.detect(data['image_base64'])
-    if detect_result['error_message'] == 601:
-        logger.info('face detect successfully')
-        # 提取特征
-        left = detect_result['detect'][0]['left']
-        top = detect_result['detect'][0]['top']
-        width = detect_result['detect'][0]['width']
-        height = detect_result['detect'][0]['height']
-        cropped_face = face_tool.crop(left, top, width, height, data['image_base64'], b64=True)
-        feature = face_tool.extract(cropped_face, detect_result['detect'][0]['landmark'])
+    feature = face_tool.feature(data['image_base64'])
+    if feature is not None:
+        logger.info('face feature extracted successfully')
         search_result = searcher.search(1, data['topk'] * 100, [feature]) # 这里默认平均每个cluster大小为100，这样的话，找出来的cluster的个数可能就接近topk
         if search_result['rtn'] == 0:
             logger.info('search successfully')
@@ -71,7 +64,7 @@ def search_proc(data, logger, query_id, start_time):
             else:
                 sql = "select `id`, `cluster_id`, `uri` from t_cluster where `id` in {} and `camera_id` in {} group by `cluster_id`".format(str(tuple(sims.keys())), str(tuple(data['camera_ids'])))
             t_cluster_result = db.select(sql)
-            if t_cluster_result is not None:
+            if t_cluster_result is not None and len(t_cluster_result) > 0:
                 logger.info('select from t_cluster success')
                 temp_data = [ (x[1], x[2], sims[x[0]], query_id, start_time) for x in t_cluster_result ]
                 sql = "insert into `t_search` (cluster_id, face_image_uri, similarity, query_id, time) values {} ".format(str(tuple(temp_data))[1:-1])
@@ -81,11 +74,11 @@ def search_proc(data, logger, query_id, start_time):
                 else:
                     logger.error('insert to t_search failed')
             else:
-                logger.error('select from t_cluster failed')
+                logger.error('select from t_cluster failed or result is null')
         else:
-            logger.error('searcher service error, error message: ', search_result['message'])
+            logger.error('faiss searcher service error, error message: ', search_result['message'])
     else:
-        logger.error('verifier service error, error code: ', detect_result['error_message'])
+        logger.error('verifier service error')
     logger.info('search process(%d) have done ', os.getpid())
 
 
@@ -159,15 +152,18 @@ def search():
                     tmp = {'cluster_id': item[0], 'face_image_uri': item[1], 'similarity': item[2]}
                     if tmp_res is not None and len(tmp_res) > 0:
                         logger.info('找到 cluster_id =', item[0], '所匹配的人像库信息')
-                        tmp['reposity_info'] = {'person_id': tmp_res[0][0], 'repository_id': tmp_res[0][1],'name': tmp_res[0][2]}
+                        repository_infos = []
+                        for temp_item in tmp_res:
+                            repository_infos.append({'person_id': temp_item[0], 'repository_id': temp_item[1],'name': temp_item[2]})
+                        tmp['repository_infos'] = repository_infos
                     results.append(tmp)
                 ret['results'] = results
                 ret['time_used'] = round((time.time() - start) * 1000)
-    logger.info('search api return: ', ret)
+    logger.info('search1 api return: ', ret)
     return json.dumps(ret)
 
 
-@search.route('/repo', methods=['POST'])
+@search.route('/repos', methods=['POST'])
 def search2():
     '''
     人脸搜索，静态库检索, 直接查找静态表
@@ -194,15 +190,104 @@ def search2():
     logger.info('parameters:', data)
 
     # todo 直接查询`t_person` 和 `t_contact`
+    repository_ids = data['repository_ids']
+    sql = "select c.cluster_id, cl.uri, c.similarity, p.person_id, p.repository_id, lib.name from `t_person` as p where p.repository_id in {} limit {},{} " \
+          "left join `t_contact` as c on p.id = c.id " \
+          "left join `t_cluster` as cl on cl.cluster_id = c.cluser_id " \
+          "left join `t_lib` as lib on lib.repository_id = p.repository_id".format(str(tuple(repository_ids)), data['start_pos'], data['limit'])
+    select_result = db.select(sql)
+    results = []
+    if select_result is not None and len(select_result) > 0:
+        logger.info('select success, cluster size: ', len(select_result))
+        # 根据cluster来读取对应的信息
+        for item in select_result:
+            tmp_result = {'cluster_id': item[0], 'face_image_uri': item[1], 'similarity': item[2]}
+            info = {'person_id': item[3], 'repository_id': item[4], 'name': item[5]}
+            tmp_result['repository_info'] = info
+            results.append(tmp_result)
+        ret['rtn'] = 0
+        ret['message'] = SEARCH_ERR['success']
+        ret['query_id'] = -1
+        ret['time_used'] = round((time.time() - start) * 1000)
+        ret['total'] = len(select_result)
+        ret['results'] = results
+    else:
+        logger.info('repository is null or `t_contact` is null')
+        ret['message'] = SEARCH_ERR['null']
+        ret['rtn'] = -1
+    logger.info('search2 api return: ', ret)
+    return json.dumps(ret)
+
 
 @search.route('/libs', methods=['POST'])
 def search3():
     '''
-    在静态库中索引
+    在静态库中索引，然后关联到动态库，返回结果
     :return:
     '''
     start = time.time()
-    # todo 直接在静态库中search
+    data = request.data.decode('utf-8')
+    necessary_params = {'image_base64', 'start_pos', 'limit'}
+    default_params = {'query_id': -1, 'camera_ids': 'all', 'topk': 100}
+    ret = {'time_used': 0, 'rtn': -1, 'query_id': -1}
+    try:
+        data = json.loads(data)
+    except json.JSONDecodeError:
+        logger.warning(GLOBAL_ERR['json_syntax_err'])
+        ret['message'] = GLOBAL_ERR['json_syntax_err']
+        return json.dumps(ret)
 
+    legal = check_param(set(data), necessary_params, set(default_params))
+    if not legal:
+        logger.warning(GLOBAL_ERR['param_err'])
+        ret['message'] = GLOBAL_ERR['param_err']
+        return json.dumps(ret)
+    data = update_param(default_params, data)
+    logger.info('parameters:', data)
 
+    face_tool = Face(config.get('api', 'face_server'))
+    feature = face_tool.feature(data['image_base64'])
+    searcher = Faiss(config.get('api', 'faiss_lib_host'), config.getint('api', 'faiss_lib_port'))
+    search_result = searcher.search(1, data['topk'] * 100, [feature])
+    if search_result['rtn'] == 0:
+        logger.info('search successfully')
+        # 过滤掉低于给定阈值相似度的向量
+        # sim_ids = [] # 存储相似的抓拍人脸id
+        # sims = [] # 存储相似度的值
+        sims = {}  # 存储相似人脸的id和对应的相似度
+        for i, distance in enumerate(search_result['results']['distances'][0]):
+            if distance >= threshold:
+                sim_id = search_result['results']['labels'][0][i]
+                sims[sim_id] = distance
+        logger.info('real topk is:', len(sims))
+        sql = "select con.cluster_id, c.uri, con.similarity, p.person_id, p.respository_id, lib.name from t_person as p where p.id in {} " \
+              "left join t_contact as con on p.id = con.id " \
+              "left join t_cluster as c on c.cluster_id = con.cluster_id" \
+              "left join t_lib as lib on p.repository_id = lib.repository_id".format(str(tuple(sims.keys())))
+        select_result = db.select(sql)
+        results = []
+        if select_result is not None and len(select_result) > 0:
+            logger.info('select success, cluster size: ', len(select_result))
+            # 根据cluster来读取对应的信息
+            for item in select_result:
+                tmp_result = {'cluster_id': item[0], 'face_image_uri': item[1], 'similarity': item[2]}
+                info = {'person_id': item[3], 'repository_id': item[4], 'name': item[5]}
+                tmp_result['repository_info'] = info
+                results.append(tmp_result)
+            ret['rtn'] = 0
+            ret['message'] = SEARCH_ERR['success']
+            ret['query_id'] = -1
+            ret['time_used'] = round((time.time() - start) * 1000)
+            ret['total'] = len(select_result)
+            ret['results'] = results
+        else:
+            logger.info('repository is null or `t_contact` is null')
+            ret['message'] = SEARCH_ERR['null']
+            ret['rtn'] = -1
+    else:
+        logger.info('search failed! please check faiss_lib_search service')
+        ret['message'] = SEARCH_ERR['fail']
+        ret['query_id'] = -1
+    logger.info('search2 api return: ', ret)
+    return json.dumps(ret)
 
