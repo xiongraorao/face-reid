@@ -17,6 +17,16 @@ SEARCH_ERR = {
     'null': 'search result is null'
 }
 
+TRACE_ERR = {
+    'time_format_err': 'start or end time format error, eg: 2018-01-01 01:01:01',
+    'success': 'get trace success'
+}
+
+FREQ_ERR = {
+    'time_format_err': 'start or end time format error, eg: 2018-01-01 01:01:01',
+    'success' : 'get frequency success'
+}
+
 CAM_INIT_ERR = {
     -1: 'network init error',
     -2: 'could not open url',

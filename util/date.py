@@ -43,4 +43,9 @@ def date_to_time(date):
 #     result = db.select(sql, 2)
 #     print(result[0][0])
 
+# test = '2018-09-08 19:00:10'
+# # timestamp = date_to_time(test)
+# timeArray = time.strptime(test, "%Y-%m-%d %H:%M:%S")
+# # print(timestamp)
+
 

@@ -1,3 +1,6 @@
+import time
+
+
 def check_param(input_params, necessary_params, optional_params):
     '''
     参数合法性校验
@@ -26,6 +29,15 @@ def update_param(default, input):
     ret = default.copy()
     ret.update(input)
     return ret
+
+def check_date(*args):
+    for date in args:
+        try:
+            time.strptime(date, "%Y-%m-%d %H:%M:%S")
+        except ValueError as e:
+            print(e)
+            return False
+    return True
 
 if __name__ == '__main__':
     input_params = {"url":"rtsp://admin:iec123456@192.168.1.72:554/unicast/c1/s0/live", "rate":2, "name":"十字路口"}
