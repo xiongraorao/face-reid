@@ -105,3 +105,5 @@ if multi:
     CMC = CMC.float()
     CMC = CMC/len(query_label) #average CMC
     print('multi Rank@1:%f Rank@5:%f Rank@10:%f mAP:%f'%(CMC[0],CMC[4],CMC[9],ap/len(query_label)))
+
+print('======over== evaluate ===')

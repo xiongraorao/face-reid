@@ -1,16 +1,24 @@
 import configparser
 import json
+import os
+import sys
 import time
 
 from flask import Blueprint, request
 
-from rest.error import *
-from rest.http_util import check_param, update_param, check_date
-from util.date import time_to_date
-from util.logger import Log
-from util.mysql import Mysql
+# get current file dir
+sup = os.path.dirname(os.path.realpath(__file__))
+sup = os.path.dirname(sup)
+if sup not in sys.path:
+    sys.path.append(sup)
 
-logger = Log('search', 'logs/')
+from .error import *
+from .http_util import check_param, update_param, check_date
+from util import time_to_date
+from util import Log
+from util import Mysql
+
+logger = Log('freq', 'logs/')
 config = configparser.ConfigParser()
 config.read('./app.config')
 
@@ -23,6 +31,7 @@ db = Mysql(host=config.get('db', 'host'),
 db.set_logger(logger)
 
 freq = Blueprint('freq', __name__)
+
 
 @freq.route('/', methods=['POST'])
 def freq():
@@ -59,7 +68,8 @@ def freq():
     if data['camera_ids'] == 'all':
         sql = "select timestamp from `t_cluster` where timestamp between %s and %s " \
               "where cluster_id = %s order by timestamp desc limit %s, %s"
-        select_result = db.select(sql, (data['start'], data['end'], data['cluster_id'], data['start_pos'], data['limit']))
+        select_result = db.select(sql,
+                                  (data['start'], data['end'], data['cluster_id'], data['start_pos'], data['limit']))
         if select_result is None or len(select_result) == 0:
             logger.info('select failed or result is null')
         else:
@@ -69,9 +79,9 @@ def freq():
             result = []
             for item in select_result:
                 t = time_to_date(item[0])
-                key = t[:10] # 2018-12-14
+                key = t[:10]  # 2018-12-14
                 raw_result[key] = 1 if key not in raw_result else raw_result[key] + 1
-            for k,v in raw_result.items():
+            for k, v in raw_result.items():
                 if v < data['freq']:
                     del raw_result[k]
                 else:

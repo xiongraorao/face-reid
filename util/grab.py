@@ -1,10 +1,12 @@
+import os
 from ctypes import *
+
 import cv2
 import numpy as np
-from util.logger import Log
-from rest.error import CAM_INIT_ERR, CAM_GRAB_ERR
-import time
-import os
+
+from .error import CAM_INIT_ERR, CAM_GRAB_ERR
+from .logger import Log
+
 
 class Grab():
     def __init__(self, url, rate, use_gpu = False):
@@ -27,7 +29,9 @@ class Grab():
         '''
         self.url = url
         self.rate = rate
-        self.ffmpegPython = cdll.LoadLibrary('./linux-build-cmake-make/ffmpeg-python.so')
+        lib_path = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), 'linux-build-cmake-make',
+                                'ffmpeg-python.so')
+        self.ffmpegPython = cdll.LoadLibrary(lib_path)
         self.ffmpegPython.init.argtypes = [c_char_p, c_bool, c_bool, POINTER(c_int), POINTER(c_int)]
         self.ffmpegPython.init.restype = c_int
         self.logger = Log('grab', is_save=False)
@@ -52,15 +56,10 @@ class Grab():
                 self.logger.warning('grab initialize failed, unknown error')
             finally:
                 self.close()
-    def get_pid(self):
-        return os.getpid()
 
-    def start(self):
-        '''
-        开始抓图，并发送kafka消息队列中
-        :return:
-        '''
-        pass
+    def __str__(self):
+        return 'Grab Object(url: %s, rate: %d, initErr: %d, width: %d, height: %d)' % (
+        self.url, self.rate, self.initErr, self.width, self.height)
 
     def grab_image(self):
         '''
@@ -107,27 +106,3 @@ class Grab():
 
     def close(self):
         self.ffmpegPython.destroy()
-
-def test(id):
-    grab = Grab('rtsp://admin:iec123456@192.168.1.72:554/unicast/c1/s0/live', 5)
-    while True:
-        img = grab.grab_image()
-        if img is not None:
-            print(img[0][0][0])
-            time.sleep(1)
-            print('process id = ', id, ', pid = ', os.getpid())
-
-if __name__ == '__main__':
-    grab = Grab('rtsp://admin:iec123456@192.168.1.72:554/unicast/c1/s0/live', 1)
-    for i in range(100):
-        img = grab.grab_image()
-        if img is not None:
-            cv2.imwrite('img/%d.jpg' % i, img)
-            print(img[100], 'count = ', i)
-    # import multiprocessing as mp
-    # pool = mp.Pool(4)
-    # for i in range(4):
-    #     pool.apply_async(test,args=(i,))
-    # #pool.join()
-    # time.sleep(1000)
-    # print('over')

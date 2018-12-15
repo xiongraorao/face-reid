@@ -88,7 +88,7 @@ class Face:
         if isPortrait:
             field = 'portrait'
         detect_result = self.detect(image_base64, field)
-        if detect_result['error_message'] != 601 or detect_result['detect_nums'] == 0:
+        if detect_result['error_message'] != '601' or detect_result['detect_nums'] == 0:
             return None
         left = detect_result['detect'][0]['left']
         top = detect_result['detect'][0]['top']
@@ -97,7 +97,7 @@ class Face:
         cropped_img = self.crop(left,top, width, height, image_base64, True)
         landmark = detect_result['detect'][0]['landmark']
         extract_result = self.extract([cropped_img], [landmark])
-        if extract_result['error_message'] != 701:
+        if extract_result['error_message'] != '701':
             return None
         feature = extract_result['feature']
         return feature

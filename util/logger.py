@@ -1,6 +1,5 @@
 import logging
 import os
-import sys
 
 LOG_FORMAT = "%(asctime)s (%(name)s) [%(levelname)s] %(message)s"
 DATE_FORMAT = "%m/%d/%Y %H:%M:%S"

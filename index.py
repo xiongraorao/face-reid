@@ -1,23 +1,20 @@
 '''
 程序入口
 '''
-import base64
 import configparser
 import json
+import time
 import uuid
 
-import cv2
-import numpy as np
 import requests
-import time
 
-from util.date import time_to_date
-from util.face import mat_to_base64, Face
-from util.logger import Log
-from util.mykafka import Kafka
-from util.mysql import Mysql
-from util.search import Search
-from util.face import bytes_to_base64
+from util import Face
+from util import Kafka
+from util import Log
+from util import Mysql
+from util import Search
+from util import bytes_to_base64
+from util import time_to_date
 
 logger = Log('index', 'logs/')
 config = configparser.ConfigParser()

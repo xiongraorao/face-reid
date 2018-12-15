@@ -1,8 +1,10 @@
+from kiwisolver import Variable
+
 import torch
 import torch.nn as nn
 from torch.nn import init
 from torchvision import models
-from torch.autograd import Variable
+
 
 ######################################################################
 def weights_init_kaiming(m):
@@ -195,11 +197,13 @@ class PCB_test(nn.Module):
         y = x.view(x.size(0),x.size(1),x.size(2))
         return y
 
-# debug model structure
-#net = ft_net(751)
-net = ft_net_dense(751)
-#print(net)
-input = Variable(torch.FloatTensor(8, 3, 224, 224))
-output = net(input)
-print('net output size:')
-print(output.shape)
+
+if __name__ == '__main__':
+    # debug model structure
+    # net = ft_net(751)
+    net = ft_net_dense(751)
+    # print(net)
+    input = Variable(torch.FloatTensor(8, 3, 224, 224))
+    output = net(input)
+    print('net output size:')
+    print(output.shape)

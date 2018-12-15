@@ -2,16 +2,23 @@ import configparser
 import json
 import multiprocessing as mp
 import os
+import sys
 import time
 
 from flask import Blueprint, request
 
-from rest.error import *
-from rest.http_util import check_param, update_param
-from util.face import Face
-from util.logger import Log
-from util.mysql import Mysql
-from util.search import Faiss
+# get current file dir
+sup = os.path.dirname(os.path.realpath(__file__))
+sup = os.path.dirname(sup)
+if sup not in sys.path:
+    sys.path.append(sup)
+
+from .error import *
+from .http_util import check_param, update_param
+from util import Face
+from util import Log
+from util import Mysql
+from util import Faiss
 
 logger = Log('search', 'logs/')
 config = configparser.ConfigParser()

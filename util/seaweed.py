@@ -1,5 +1,6 @@
 import requests
 
+
 class WeedMaster():
     def __init__(self, host='127.0.0.1', port=9333):
         self.host = host
@@ -14,7 +15,7 @@ class WeedMaster():
         {'fid': '1,04bdb7f514', 'url': '192.168.1.6:38080', 'publicUrl': '192.168.1.6:38080', 'count': 1}
         '''
         url = 'http://' + self.host + ':' + str(self.port) + '/dir/assign'
-        params = {'replication': replication, 'count':count}
+        params = {'replication': replication, 'count': count}
         if dataCenter is not None:
             params['dataCenter'] = dataCenter
         res = requests.get(url, params=params)
@@ -33,7 +34,7 @@ class WeedMaster():
         res = requests.get(url, params=params)
         return res.json()
 
-    def allocate(self, replication='000', count = 1,  collection=None, dataCenter = None, ttl = None):
+    def allocate(self, replication='000', count=1, collection=None, dataCenter=None, ttl=None):
         '''
         pre-allocate new volumes
         :param replication:
@@ -56,7 +57,7 @@ class WeedMaster():
 
     def collect_del(self, collection):
         url = 'http://' + self.host + ':' + str(self.port) + '/col/delete'
-        res = requests.get(url, params={'collection':collection})
+        res = requests.get(url, params={'collection': collection})
         return res.json()
 
     def status(self):
@@ -67,6 +68,7 @@ class WeedMaster():
         url = 'http://' + self.host + ':' + str(self.port) + '/cluster/status'
         res = requests.get(url)
         return res.json()
+
 
 class WeedVolume:
     def __init__(self, host='127.0.0.1', port=38080):
@@ -82,7 +84,7 @@ class WeedVolume:
         :return:
         '''
         url = 'http://' + self.host + ':' + str(self.port) + '/' + fid
-        res = requests.put(url, files={name:file_bytes})
+        res = requests.put(url, files={name: file_bytes})
         return res.json()
 
     def dowload(self, fid):
@@ -94,36 +96,3 @@ class WeedVolume:
         url = 'http://' + self.host + ':' + str(self.port) + '/' + fid
         res = requests.get(url)
         return res.content
-
-if __name__ == '__main__':
-    weed = WeedMaster('192.168.1.6', 9333)
-    #weed.assign()
-    #weed.lookup("17,03eb52d0de")
-    #weed.status()
-
-    weed2 = WeedVolume('192.168.1.6', 38080)
-    # with open('F:\\man.jpg', 'rb') as f:
-    #     bs = f.read()
-    # ret = weed.assign()
-    # print(ret['fid'])
-    # ret = weed2.upload(ret['fid'], bs, 'man.jpg')
-    # print(ret)
-
-    # ret_bytes = weed2.dowload('1,08bc086fdd')
-    # with open('F:\\hhh.jpg', 'wb') as f:
-    #     f.write(ret_bytes)
-
-    # test for cv to download or upload data
-    import cv2
-    import numpy as np
-    img = cv2.imread('F:\\man.jpg')
-    ret = weed.assign()
-    fid = ret['fid']
-    print(ret)
-    bs = []
-    bs = cv2.imencode('.jpg', img)
-    ret = weed2.upload(fid, bs[1], 'man.jpg')
-    print(ret)
-    img2 = weed2.dowload(fid)
-    cv2.imshow('img', cv2.imdecode(np.fromstring(img2, np.uint8), cv2.IMREAD_COLOR))
-    cv2.waitKey(0)

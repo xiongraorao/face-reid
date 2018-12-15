@@ -1,15 +1,23 @@
 import configparser
 import json
+import os
+import sys
 import time
 
 from flask import Blueprint, request
 
-from rest.error import *
-from rest.http_util import check_param, update_param, check_date
-from util.logger import Log
-from util.mysql import Mysql
+# get current file dir
+sup = os.path.dirname(os.path.realpath(__file__))
+sup = os.path.dirname(sup)
+if sup not in sys.path:
+    sys.path.append(sup)
 
-logger = Log('search', 'logs/')
+from .error import *
+from .http_util import check_param, update_param, check_date
+from util import Log
+from util import Mysql
+
+logger = Log('trace', 'logs/')
 config = configparser.ConfigParser()
 config.read('./app.config')
 

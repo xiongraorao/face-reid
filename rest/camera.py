@@ -1,18 +1,27 @@
 import configparser
 import json
 import multiprocessing as mp
+import os
+import sys
 import time
 
 from flask import Blueprint, request
 
-from rest.error import *
-from rest.http_util import check_param, update_param
-from util.face import Face, mat_to_base64, base64_to_bytes
-from util.grab import Grab
-from util.logger import Log
-from util.mykafka import Kafka
-from util.mysql import Mysql
-from util.seaweed import WeedVolume, WeedMaster
+# get current file dir
+sup = os.path.dirname(os.path.realpath(__file__))
+sup = os.path.dirname(sup)
+if sup not in sys.path:
+    sys.path.append(sup)
+
+from .error import *
+from .http_util import check_param, update_param
+
+from util import Face, mat_to_base64, base64_to_bytes
+from util import Grab
+from util import Log
+from util import Kafka
+from util import Mysql
+from util import WeedVolume, WeedMaster
 
 logger = Log('camera', 'logs/')
 config = configparser.ConfigParser()
@@ -46,14 +55,14 @@ def grab_proc(url, rate, camera_id, logger):
         sql = 'update `t_camera` set state = %s where id = %s '
         ret = db.update(sql, (g.initErr, camera_id))
         if ret:
-            logger.info('更新摄像头state成功')
+            logger.info([camera_id], '更新摄像头state成功')
         else:
-            logger.info('更新摄像头state失败')
-        logger.info('摄像头视频流初始化失败, %s ' % CAM_INIT_ERR[g.initErr])
+            logger.info([camera_id], '更新摄像头state失败')
+        logger.info([camera_id], '摄像头视频流初始化失败, %s ' % CAM_INIT_ERR[g.initErr])
         g.close()  # 关闭抓图进程
         return
     else:
-        logger.info('摄像头视频流初始化正常')
+        logger.info([camera_id], '摄像头视频流初始化正常')
     logger.info('初始化seaweedfs')
     master = WeedMaster(config.get('weed', 'm_host'), config.getint('weed', 'm_port'))
     volume = WeedVolume(config.get('weed', 'v_host'), config.getint('weed', 'v_port'))
@@ -72,7 +81,7 @@ def grab_proc(url, rate, camera_id, logger):
             b64 = mat_to_base64(img)
             face = face_tool.detect(b64, field='track', camera_id=str(camera_id))
             for num in range(face['track_nums']):
-                logger.info('track person success! num = %d' % num)
+                logger.info([camera_id], 'track person success! num = %d' % num)
                 face_b64 = face['track'][num]['image_base64']
 
                 # mat = base64_to_mat(detect_face)
@@ -80,20 +89,20 @@ def grab_proc(url, rate, camera_id, logger):
                 # logger.info('detect_face: ', detect_face)
 
                 # save img to seaweed fs
-                logger.info('save grabbed face to seaweed fs')
+                logger.info([camera_id], 'save grabbed face to seaweed fs')
                 assign = master.assign()
-                logger.info('assign result:', assign)
+                logger.info([camera_id], 'assign result:', assign)
                 # bs = cv2.imencode('.jpg', detect_face)
 
                 ret = volume.upload(assign['fid'], base64_to_bytes(face_b64), assign['fid'] + '.jpg')
-                logger.info('upload result:', ret)
+                logger.info([camera_id], 'upload result:', ret)
 
                 # send to Kafka
                 url = 'http' + ':' + '//' + assign['url'] + '/' + assign['fid']
                 logger.info('[', camera_id, ']', 'img url:', url)
                 msg = json.dumps({'url': url, 'time': int(face['track'][num]['bestTime']), 'camera_id': camera_id,
                                   'landmark': face['track'][num]['landmark']})
-                logger.info('send to kafka: ', msg)
+                logger.info([camera_id], 'send to kafka: ', msg)
                 kafka.send(topic, msg)
                 count = 0
         else:

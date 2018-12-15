@@ -5,15 +5,17 @@ import sys
 import cv2
 import numpy as np
 import torch
+import torch.nn as nn
 from torch.autograd import Variable
 from torchvision.transforms import transforms
 
-ssd_path = os.path.abspath(os.path.join('..'))
-if ssd_path not in sys.path:
-    sys.path.append(ssd_path)
+# get current file dir
+sup = os.path.dirname(os.path.realpath(__file__))
+sup = os.path.dirname(sup)
+if sup not in sys.path:
+    sys.path.append(sup)
 
-from  reid.model import ft_net, ft_net_dense, PCB, PCB_test
-import torch.nn as nn
+from reid.model import ft_net, ft_net_dense, PCB, PCB_test
 from ssd.data import VOC_CLASSES as lables
 from ssd.ssd import build_ssd
 
@@ -203,7 +205,7 @@ class Ped:
             if rectified:
                 x = 0 if x < 0 else x
                 y = 0 if y < 0 else y
-                h = height - y - 1 if y + h > height else  h
+                h = height - y - 1 if y + h > height else h
                 w = width - x - 1 if x + w > width else w
             else:
                 is_inner = x >= 0 and x + w < width and y >= 0 and y + h < height
@@ -224,7 +226,7 @@ def grab(q, url, frame_rate=1, logger=None):
     :param q:
     :return:
     '''
-    #print('启动抓取线程，url: %s, frame_rate: %d' % (url, frame_rate))
+    # print('启动抓取线程，url: %s, frame_rate: %d' % (url, frame_rate))
     if logger is not None:
         logger.info('[grab] 启动抓取线程，url: %s, frame_rate: %d' % (url, frame_rate))
     capture = cv2.VideoCapture(url)
@@ -242,7 +244,7 @@ def grab(q, url, frame_rate=1, logger=None):
             q.put(img)
             count = 0
             count2 += 1
-            #print('[grab] grab %d image' % count2)
+            # print('[grab] grab %d image' % count2)
             if logger is not None:
                 logger.info('[grab] grab %d image' % count2)
     except KeyboardInterrupt:
