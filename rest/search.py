@@ -153,8 +153,12 @@ def search():
                 ret['total'] = len(result)
                 results = []
                 for item in result:
-                    sql = "select t_contact.person_id, t_contact.repository_id t_lib.name from t_contact left join t_lib" \
-                          " on t_contact.reposity_id = t_lib.repository_id where t_contact.cluster_id = %s"
+                    sql = "select x.id, t_person.repository_id t_lib.name from (select id from t_contact where cluster_id = %s) as x " \
+                          "left join t_person " \
+                          " on x.id = t_person.id left join t_lib on t_person.repository_id = t_lib.repository_id "
+
+                    sql2 = "select t_contact.id , t_person.repository_id, t_lib.name from t_contact, t_perosn, t_lib " \
+                           "where t_contact.cluster_id = %s and t_contact.id = t_person.id and t_person.repository_id = t_lib.repository_id"
                     tmp_res = db.select(sql, (item[0]))
                     tmp = {'cluster_id': item[0], 'face_image_uri': item[1], 'similarity': item[2]}
                     if tmp_res is not None and len(tmp_res) > 0:
@@ -202,6 +206,11 @@ def search2():
           "left join `t_contact` as c on p.id = c.id " \
           "left join `t_cluster` as cl on cl.cluster_id = c.cluser_id " \
           "left join `t_lib` as lib on lib.repository_id = p.repository_id".format(str(tuple(repository_ids)), data['start_pos'], data['limit'])
+
+    sql = "select p.id, p.repository_id, lib.name, con.cluster_id, clu.uri from (t_person p " \
+          "left join t_lib lib on p.repository_id = lib.repository_id where p.repository_id in {}) x " \
+          "left join (t_contact con left join t_cluster clu on clu.cluster_id = con.cluster_id) y on x.id = y.id" \
+
     select_result = db.select(sql)
     results = []
     if select_result is not None and len(select_result) > 0:
