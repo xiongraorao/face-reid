@@ -14,7 +14,7 @@ if sup not in sys.path:
     sys.path.append(sup)
 
 from .error import *
-from .http_util import check_param, update_param
+from .param_tool import check_param, update_param
 from util import Face
 from util import Log
 from util import Mysql

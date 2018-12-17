@@ -1,7 +1,7 @@
 import requests
 
 
-class WeedMaster():
+class WeedClient():
     def __init__(self, host='127.0.0.1', port=9333):
         self.host = host
         self.port = port
@@ -20,6 +20,28 @@ class WeedMaster():
             params['dataCenter'] = dataCenter
         res = requests.get(url, params=params)
         return res.json()
+
+    def upload(self, url, fid, file_bytes, name='default'):
+        '''
+        upload file by binary array
+        :param url:
+        :param fid:
+        :param file_bytes:
+        :param name:
+        :return:
+        '''
+        url = 'http://' + url + '/' + fid
+        res = requests.put(url, files={name: file_bytes})
+        return res.json()
+
+    def download(self, url):
+        '''
+        download file to binary array
+        :param url:
+        :return:
+        '''
+        res = requests.get(url)
+        return res.content
 
     def lookup(self, fid):
         '''
@@ -68,31 +90,3 @@ class WeedMaster():
         url = 'http://' + self.host + ':' + str(self.port) + '/cluster/status'
         res = requests.get(url)
         return res.json()
-
-
-class WeedVolume:
-    def __init__(self, host='127.0.0.1', port=38080):
-        self.host = host
-        self.port = port
-
-    def upload(self, fid, file_bytes, name='default'):
-        '''
-        upload file by binary array
-        :param fid:
-        :param file_bytes:
-        :param name:
-        :return:
-        '''
-        url = 'http://' + self.host + ':' + str(self.port) + '/' + fid
-        res = requests.put(url, files={name: file_bytes})
-        return res.json()
-
-    def dowload(self, fid):
-        '''
-        download file to binary array
-        :param fid:
-        :return:
-        '''
-        url = 'http://' + self.host + ':' + str(self.port) + '/' + fid
-        res = requests.get(url)
-        return res.content

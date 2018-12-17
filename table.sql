@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS `t_lib`(
 # 静态库成员表
 CREATE TABLE IF NOT EXISTS `t_person`(
   `id` INT PRIMARY KEY AUTO_INCREMENT COMMENT 'person_id',
-  `name` VARCHAR(100) NOT NULL COMMENT '人员名字',
+  `name` VARCHAR(100) NOT NULL COMMENT '人员名字，传入数据的person_id',
   `uri` VARCHAR(100) NOT NULL COMMENT '人员图片路径',
   `repository_id` INT NOT NULL COMMENT '人像库ID',
   FOREIGN KEY (`repository_id`)REFERENCES `t_lib`(`repository_id`)

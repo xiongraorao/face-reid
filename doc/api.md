@@ -12,6 +12,13 @@
   - [轨迹查询](#%E8%BD%A8%E8%BF%B9%E6%9F%A5%E8%AF%A2)
   - [频次查询](#%E9%A2%91%E6%AC%A1%E6%9F%A5%E8%AF%A2)
   - [同行人查询](#%E5%90%8C%E8%A1%8C%E4%BA%BA%E6%9F%A5%E8%AF%A2)
+  - [人像库](#%E4%BA%BA%E5%83%8F%E5%BA%93)
+    - [新建](#%E6%96%B0%E5%BB%BA)
+    - [删除](#%E5%88%A0%E9%99%A4-1)
+    - [修改](#%E4%BF%AE%E6%94%B9-1)
+    - [查询](#%E6%9F%A5%E8%AF%A2)
+    - [文件夹导入](#%E6%96%87%E4%BB%B6%E5%A4%B9%E5%AF%BC%E5%85%A5)
+    - [图片数据导入](#%E5%9B%BE%E7%89%87%E6%95%B0%E6%8D%AE%E5%AF%BC%E5%85%A5)
 <!-- toc -->
 
 # API 文档
@@ -342,3 +349,148 @@
 | results.src_time | `string` | 同行的某时刻的目标者时间
 | results.peer_time | `string` | 同行的某时刻的同行人时间
 | results.camera_id | `string` | 在具体的哪一个摄像机下同行
+
+## 人像库
+
+人像库即静态人像库，为包含具体的身份信息的人脸图片的集合
+
+### 新建
+
+新建人像库
+
+请求地址：http://host:port/repository/add
+请求方式：post
+请求类型：application/json
+
+**输入参数：**
+
+| 参数名 | 是否必选 | 参数类型 | 参数说明
+|:---:|:---:|:---:|:---:|
+| name | 是 | `string` | 人像库的名称
+
+**输出参数：**
+
+| 参数名 | 参数类型 | 参数说明
+|:---:|:---:|:---:|
+| time_used | `int` | 整个请求所花费的时间，单位为毫秒
+| rtn | `int` | 请求执行状态；0表示接收正常，非0表示接收异常
+| message |	`string` | 请求执行状态描述
+| id | `string` | 人像库的ID
+
+### 删除
+
+删除人像库
+
+请求地址：http://host:port/repository/del
+请求方式：post
+请求类型：application/json
+
+**输入参数：**
+
+| 参数名 | 是否必选 | 参数类型 | 参数说明
+|:---:|:---:|:---:|:---:|
+| id | 是 | `string` | 人像库ID
+
+**输出参数：**
+
+| 参数名 | 参数类型 | 参数说明
+|:---:|:---:|:---:|
+| time_used | `int` | 整个请求所花费的时间，单位为毫秒
+| rtn | `int` | 请求执行状态；0表示接收正常，非0表示接收异常
+| message |	`string` | 请求执行状态描述
+
+### 修改
+
+修改人像库
+
+请求地址：http://host:port/repository/update
+请求方式：post
+请求类型：application/json
+
+**输入参数：**
+
+| 参数名 | 是否必选 | 参数类型 | 参数说明
+|:---:|:---:|:---:|:---:|
+| id | 是 | `string` | 人像库ID
+| name | 是 | `string` | 人像库的名称
+
+**输出参数：**
+
+| 参数名 | 参数类型 | 参数说明
+|:---:|:---:|:---:|
+| time_used | `int` | 整个请求所花费的时间，单位为毫秒
+| rtn | `int` | 请求执行状态；0表示接收正常，非0表示接收异常
+| message |	`string` | 请求执行状态描述
+
+### 查询
+
+查询人像库，得到所有的库的信息
+
+请求地址：http://host:port/repository/get
+请求方式：get
+请求类型：application/json
+
+
+**输入参数：**
+
+| 参数名 | 是否必选 | 参数类型 | 参数说明
+|:---:|:---:|:---:|:---:|
+
+**输出参数：**
+
+| 参数名 | 参数类型 | 参数说明
+|:---:|:---:|:---:|
+| repositories| `Array<string>` | 人像库
+| repositories.id | `string` | 人像库ID
+| repositories.name  | `string` | 人像库的名称
+| repositories.total | `int` | 人像库的人员数量
+| time_used | `int` | 整个请求所花费的时间，单位为毫秒
+| rtn | `int` | 请求执行状态；0表示接收正常，非0表示接收异常
+| message |	`string` | 请求执行状态描述
+
+### 文件夹导入
+
+人员id为图片的名称，例如xxx.jpg, 人员ID为xxx
+
+请求地址：http://host:port/repository/picture/batch_uri
+请求方式：post
+请求类型：application/json
+
+**输入参数：**
+
+| 参数名 | 是否必选 | 参数类型 | 参数说明
+|:---:|:---:|:---:|:---:|
+| repository_id | 是 | `string` | 人像库ID
+| name | 是 | `string` | 人像库的名称
+| path | 是 | `String` | 图片文件夹的路径
+
+**输出参数：**
+
+| 参数名 | 参数类型 | 参数说明
+|:---:|:---:|:---:|
+| time_used | `int` | 整个请求所花费的时间，单位为毫秒
+| rtn | `int` | 请求执行状态；0表示接收正常，非0表示接收异常
+| message |	`string` | 请求执行状态描述
+
+### 图片数据导入
+
+请求地址：http://host:port/repository/picture/batch_image
+请求方式：post
+请求类型：application/json
+
+**输入参数：**
+
+| 参数名 | 是否必选 | 参数类型 | 参数说明
+|:---:|:---:|:---:|:---:|
+| repository_id | 是 | `string` | 人像库ID
+| images | 是 | `Array<Object>` | 图片数据
+| images.image_base64 | 是 | `String` | 图片base64编码
+| images.person_id | 是 | 人员的ID
+
+**输出参数：**
+
+| 参数名 | 参数类型 | 参数说明
+|:---:|:---:|:---:|
+| time_used | `int` | 整个请求所花费的时间，单位为毫秒
+| rtn | `int` | 请求执行状态；0表示接收正常，非0表示接收异常
+| message |	`string` | 请求执行状态描述

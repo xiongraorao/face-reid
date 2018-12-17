@@ -39,3 +39,8 @@ FREQ_ERR = {
     'time_format_err': 'start or end time format error, eg: 2018-01-01 01:01:01',
     'success' : 'get frequency success'
 }
+
+REPO_ERR = {
+    'success': 'repository operation succeeded',
+    'fail': 'repository operation failed'
+}

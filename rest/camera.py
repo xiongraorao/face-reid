@@ -14,14 +14,14 @@ if sup not in sys.path:
     sys.path.append(sup)
 
 from .error import *
-from .http_util import check_param, update_param
+from .param_tool import check_param, update_param
 
 from util import Face, mat_to_base64, base64_to_bytes
 from util import Grab
 from util import Log
 from util import Kafka
 from util import Mysql
-from util import WeedVolume, WeedMaster
+from util import WeedClient
 
 logger = Log('camera', 'logs/')
 config = configparser.ConfigParser()
@@ -64,8 +64,7 @@ def grab_proc(url, rate, camera_id, logger):
     else:
         logger.info([camera_id], '摄像头视频流初始化正常')
     logger.info('初始化seaweedfs')
-    master = WeedMaster(config.get('weed', 'm_host'), config.getint('weed', 'm_port'))
-    volume = WeedVolume(config.get('weed', 'v_host'), config.getint('weed', 'v_port'))
+    master = WeedClient(config.get('weed', 'host'), config.getint('weed', 'port'))
     logger.info('初始化Kafka')
     kafka = Kafka(bootstrap_servers=config.get('kafka', 'boot_servers'))
     topic = config.get('camera', 'topic')
@@ -94,7 +93,7 @@ def grab_proc(url, rate, camera_id, logger):
                 logger.info([camera_id], 'assign result:', assign)
                 # bs = cv2.imencode('.jpg', detect_face)
 
-                ret = volume.upload(assign['fid'], base64_to_bytes(face_b64), assign['fid'] + '.jpg')
+                ret = master.upload(assign['url'], assign['fid'], base64_to_bytes(face_b64), assign['fid'] + '.jpg')
                 logger.info([camera_id], 'upload result:', ret)
 
                 # send to Kafka
@@ -124,7 +123,7 @@ def add():
     data = request.data.decode('utf-8')
     necessary_params = {'url'}
     default_params = {'rate': 1, 'grab': 1, 'name': 'Default Camera'}
-    ret = {'time_used': 0, 'rtn': -1, 'id': 'null'}
+    ret = {'time_used': 0, 'rtn': -1, 'id': -1}
     # 检查json 格式
     try:
         data = json.loads(data)
@@ -148,7 +147,7 @@ def add():
     if camera_id == -1:
         logger.info('添加摄像头失败')
         ret['rtn'] = -2
-        ret['message'] = CAM_ERR['success']
+        ret['message'] = CAM_ERR['fail']
     else:
         logger.info('添加摄像头成功')
         ret['time_used'] = round((time.time() - start) * 1000)
@@ -175,7 +174,7 @@ def add():
             db.commit()
             logger.info('只添加摄像头，不抓图')
     logger.debug('process_pool: ', proc_pool)
-
+    logger.info('camera add api return: ', ret)
     return json.dumps(ret)
 
 
@@ -208,7 +207,7 @@ def delete():
         proc_pool[data['id']].terminate()  # 停止抓图进程
 
     sql = "delete from `t_camera` where id = %s "
-    result = db.update(sql, (data['id']))
+    result = db.delete(sql, (data['id']))
     if result:
         logger.info('摄像头删除成功')
         ret['time_used'] = round((time.time() - start) * 1000)
@@ -222,6 +221,7 @@ def delete():
         ret['rnt'] = -1
         ret['message'] = CAM_ERR['fail']
     logger.debug('process_pool:', proc_pool)
+    logger.info('camera delete api return: ', ret)
     return json.dumps(ret)
 
 
@@ -280,7 +280,9 @@ def update():
         ret['time_used'] = 0
         ret['rnt'] = -1
         ret['message'] = CAM_ERR['fail']
+
     logger.info('process_pool:', proc_pool)
+    logger.info('camera update api return: ', ret)
     return json.dumps(ret)
 
 
@@ -306,12 +308,13 @@ def state():
     camera_id = data['id']
     sql = "select state from `t_camera` where id = %s "
     result = db.select(sql, camera_id)
-    if len(result) == 0:
+    if len(result) == 0 or result is None:
         logger.warning('状态查询失败，找不到摄像头!')
         ret['message'] = CAM_ERR['fail']
-        return json.dumps(ret)
     else:
         logger.warning('状态查询成功')
         ret['message'] = CAM_ERR['success']
         ret['state'] = result[0][0]
-        return json.dumps(ret)
+
+    logger.info('camera state api return: ', ret)
+    return json.dumps(ret)

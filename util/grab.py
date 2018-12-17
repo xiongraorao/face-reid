@@ -32,7 +32,8 @@ class Grab():
         lib_path = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), 'linux-build-cmake-make',
                                 'ffmpeg-python.so')
         self.ffmpegPython = cdll.LoadLibrary(lib_path)
-        self.ffmpegPython.init.argtypes = [c_char_p, c_bool, c_bool, POINTER(c_int), POINTER(c_int)]
+        # char *input_filename, bool nobuffer, bool use_gpu, int timeout, [out] width, [out] height
+        self.ffmpegPython.init.argtypes = [c_char_p, c_bool, c_bool, c_int, POINTER(c_int), POINTER(c_int)]
         self.ffmpegPython.init.restype = c_int
         self.logger = Log('grab', is_save=False)
 
@@ -43,7 +44,7 @@ class Grab():
         pheight = pointer(height)
         self.width = 0
         self.height = 0
-        self.initErr = self.ffmpegPython.init(url.encode("utf8"), True, use_gpu, pwidth, pheight)
+        self.initErr = self.ffmpegPython.init(url.encode("utf8"), True, use_gpu, 3, pwidth, pheight)
         if self.initErr == 0:
             self.width = width.value
             self.height = height.value

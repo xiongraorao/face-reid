@@ -6,4 +6,5 @@ from .mykafka import Kafka
 from .mysql import Mysql
 # from .pedestrian import Ped
 from .search import Search, Faiss
-from .seaweed import WeedMaster, WeedVolume
+from .seaweed import WeedClient
+from .http import get_as_base64

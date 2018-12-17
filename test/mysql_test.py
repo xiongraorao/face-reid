@@ -35,8 +35,12 @@ if __name__ == '__main__':
     # ret = db.select(sql)
     # print(ret)
     # print(len(ret))
-    sql = "insert into `t_camera` (name, url) values ('name1', 'url1'), ('name2', 'url2')"
-    ret = db.insert(sql)
-    db.commit()
+    # sql = "insert into `t_camera` (name, url) values ('name1', 'url1'), ('name2', 'url2')"
+    # ret = db.insert(sql)
+    # db.commit()
+    # print(ret)
+
+    sql = "select * from t_test"
+    ret = db.select(sql)
     print(ret)
 
