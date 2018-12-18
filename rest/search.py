@@ -45,6 +45,7 @@ def search_proc(data, logger, query_id, start_time):
     :return:
     '''
     # 1. 从索引接口中查询数据
+    # todo 修改搜索的相似度计算问题
     searcher = Faiss(config.get('api', 'faiss_host'), config.getint('api', 'faiss_port'))
     face_tool = Face(config.get('api', 'face_server'))
     feature = face_tool.feature(data['image_base64'])

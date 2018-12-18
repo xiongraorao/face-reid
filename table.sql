@@ -21,16 +21,6 @@ CREATE TABLE IF NOT EXISTS `t_cluster`(
 );
 CREATE INDEX cluster ON `t_cluster`(cluster_id); # 给动态库的cluster创建索引, 用于轨迹查询
 
-# 动态cluster 和 静态库的关联
-CREATE TABLE IF NOT EXISTS `t_contact`(
-  `id` INT PRIMARY KEY COMMENT 'person_id，用于和动态库关联',
-  `cluster_id` VARCHAR(100) NOT NULL COMMENT '动态库的类ID',
-  `similarity` FLOAT COMMENT '该person和cluster_id的相似度',
-#   `repository_id` INT UNIQUE COMMENT '人像库ID',
-#   `person_id` VARCHAR(100) COMMENT '人员ID(名字)',
-  FOREIGN KEY (id) REFERENCES `t_person`(`id`) ON UPDATE CASCADE ON DELETE CASCADE
-#   FOREIGN KEY (repository_id) REFERENCES `t_lib`(`repository_id`) ON UPDATE CASCADE ON DELETE CASCADE
-);
 
 # 静态库表
 CREATE TABLE IF NOT EXISTS `t_lib`(
@@ -46,6 +36,18 @@ CREATE TABLE IF NOT EXISTS `t_person`(
   `repository_id` INT NOT NULL COMMENT '人像库ID',
   FOREIGN KEY (`repository_id`)REFERENCES `t_lib`(`repository_id`)
     ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+
+# 动态cluster 和 静态库的关联
+CREATE TABLE IF NOT EXISTS `t_contact`(
+  `id` INT PRIMARY KEY COMMENT 'person_id，用于和动态库关联',
+  `cluster_id` VARCHAR(100) NOT NULL COMMENT '动态库的类ID',
+  `similarity` FLOAT COMMENT '该person和cluster_id的相似度',
+#   `repository_id` INT UNIQUE COMMENT '人像库ID',
+#   `person_id` VARCHAR(100) COMMENT '人员ID(名字)',
+  FOREIGN KEY (id) REFERENCES `t_person`(`id`) ON UPDATE CASCADE ON DELETE CASCADE
+#   FOREIGN KEY (repository_id) REFERENCES `t_lib`(`repository_id`) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 # search 查询结果
@@ -77,16 +79,29 @@ CREATE TABLE IF NOT EXISTS `t_freq`(
 
 # 同行人
 CREATE TABLE IF NOT EXISTS `t_peer`(
-  `query_id` INT PRIMARY KEY AUTO_INCREMENT COMMENT 'query task id',
+  `id` INT PRIMARY KEY AUTO_INCREMENT COMMENT '标识查询结果',
+  `query_id` INT COMMENT 'query_id, 用于查找结果',
   `total` INT DEFAULT 0 COMMENT 'total result count',
   `cluster_id` INT COMMENT '和目标同行的cluster_id',
-  `prob` VARCHAR(10) COMMENT '两个人同行的概率',
-  `src_img` VARCHAR(100) COMMENT '目标人图片的URL',
-  `sample_id` INT COMMENT '同行人的ID（sample_id)'
+  `times` INT COMMENT '目标人员和该cluster人员的同行次数',
+  `start_time` TIMESTAMP COMMENT '开始同行时间',
+  `end_time` TIMESTAMP COMMENT '结束同行时间',
+  `prob` VARCHAR(10) COMMENT '两个人同行的概率'
 );
 
-# test
-CREATE TABLE `t_test`(
-  `id` INT PRIMARY KEY AUTO_INCREMENT,
-  `time` DATETIME
-)
+CREATE TABLE IF NOT EXISTS `t_peer_detail`(
+  `id` INT COMMENT '对应t_peer 表的id，用于存储具体的detail信息',
+  `src_img` varchar(100) COMMENT '同行的某时刻的目标抓拍照',
+  `peer_img` varchar(100) COMMENT '同行的某时刻的同行人抓拍照',
+  `src_time` TIMESTAMP COMMENT '同行的某时刻的目标抓拍时间',
+  `peer_time` TIMESTAMP COMMENT '同行的某时刻的同行人抓拍时间',
+  `camera_id` INT COMMENT '在具体的哪一个摄像机下同行'
+);
+
+# 设置SQL mode
+
+# 查看当前模式：
+SELECT @@GLOBAL.sql_mode;
+SELECT @@SESSION.sql_mode;
+SELECT @@sql_mode;
+# doc: https://blog.csdn.net/kk185800961/article/details/79426041

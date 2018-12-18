@@ -49,7 +49,7 @@
 
 | 参数名 | 参数类型 | 参数说明
 |:---:|:---:|:---:|
-| id | `string` | 摄像头id（这里为数据库返回的唯一ID）
+| id | `int` | 摄像头id（这里为数据库返回的唯一ID）
 | time_used | `int` | 整个请求所花费的时间，单位为毫秒
 | rtn | `int` | 请求执行状态；0表示接收正常，非0表示接收异常
 | message |	`string` | 请求执行状态描述
@@ -64,7 +64,7 @@
 
 | 参数名 | 是否必选 | 参数类型 | 参数说明
 |:---:|:---:|:---:|:---:|
-| id | 是 | `string` | 摄像头唯一ID
+| id | 是 | `int` | 摄像头唯一ID
 
 
 **输出参数：**
@@ -86,7 +86,7 @@
 
 | 参数名 | 是否必选 | 参数类型 | 参数说明
 |:---:|:---:|:---:|:---:|
-| id | 是 | `string` | 摄像头唯一ID
+| id | 是 | `int` | 摄像头唯一ID
 | url | 是 | `string` | 摄像头RTSP地址
 | rate | 是 | `int` | 摄像头每秒抓的帧数，默认值1
 | grab | 否 | `int` | 是否开启抓图，默认为1，表示采集，0表示不采集
@@ -111,7 +111,7 @@
 
 | 参数名 | 是否必选 | 参数类型 | 参数说明
 |:---:|:---:|:---:|:---:|
-| id | 是 | `string` | 摄像头唯一ID
+| id | 是 | `int` | 摄像头唯一ID
 
 **输出参数：**
 
@@ -140,7 +140,7 @@
 | query_id | 否	| `string`  | 结果翻页的时候, 使用这个 id 来查询, 缺省表示重新开启一个任务
 | start_pos | 是 | `int` | 从第几个开始返回
 | limit | 是 | `int` | 返回至多多少个结果
-| camera_ids | 否 | `Array<string>` | 关注的摄像头列表，默认为所有
+| camera_ids | 否 | `Array<int>` | 关注的摄像头列表，默认为所有
 | topk | 否	| int |	输出多少个检索结果，默认为100（实际上也有可能小于该值）
 
 **输出参数：**
@@ -178,7 +178,7 @@
 | query_id | 否	| `string`  | 结果翻页的时候, 使用这个 id 来查询, 缺省表示重新开启一个任务
 | start_pos | 是 | `int` | 从第几个开始返回
 | limit | 是 | `int` | 返回至多多少个结果
-| camera_ids | 否 | `Array<string>` | 关注的摄像头列表，默认为所有
+| camera_ids | 否 | `Array<int>` | 关注的摄像头列表，默认为所有
 | topk | 否	| int |	输出多少个检索结果，默认为100（实际上也有可能小于该值）
 
 **输出参数：**
@@ -215,7 +215,7 @@
 | query_id | 否	| `string`  | 结果翻页的时候, 使用这个 id 来查询, 缺省表示重新开启一个任务
 | start_pos | 是 | `int` | 从第几个开始返回
 | limit | 是 | `int` | 返回至多多少个结果
-| camera_ids | 否 | `Array<string>` | 关注的摄像头列表，默认为所有
+| camera_ids | 否 | `Array<int>` | 关注的摄像头列表，默认为所有
 | topk | 否	| int |	输出多少个检索结果，默认为100（实际上也有可能小于该值）
 
 **输出参数：**
@@ -251,7 +251,7 @@
 | cluster_id | 是 | `string` | 目标search之后，人为选择的cluster_id
 | start | 是 | `Datetime` | 目标轨迹开始时间，精确到秒
 | end | 是 | `Datetime` | 目标轨迹结束时间，精确到秒
-| camera_ids | 否 | `Array<string>` | 关注的摄像头列表，默认为所有
+| camera_ids | 否 | `Array<int>` | 关注的摄像头列表，默认为所有
 | query_id | 否	| `string`  | 结果翻页的时候, 使用这个 id 来查询, 缺省表示重新开启一个任务
 | start_pos | 是 | `int` | 从第几个开始返回
 | limit | 是 | `int` | 返回至多多少个结果
@@ -290,7 +290,7 @@
 | query_id | 否 | `string` | 该请求任务ID，用于快速获取结果，不传参数则重新计算
 | start_pos | 是 | `int` | 从第几个开始返回
 | limit | 是 | `int` | 返回至多多少个结果
-| camera_ids | 否 | `Array<string>` | 关注的摄像头列表，默认为所有
+| camera_ids | 否 | `Array<int>` | 关注的摄像头列表，默认为所有
 
 **输出参数：**
 
@@ -325,7 +325,7 @@
 | threshold | 是 | `float` | 0-1之间，只输出同行概率大于该值的条目
 | start_pos | 是 | `int` | 从第几个开始返回
 | limit | 是 | `int` | 返回至多多少个结果
-| camera_ids | 否 | `Array<string>` | 关注的摄像头列表，默认为所有
+| camera_ids | 否 | `Array<int>` | 关注的摄像头列表，默认为所有
 
 **输出参数：**
 
@@ -340,15 +340,15 @@
 | results.cluster_id | `string` | 同行人所在的类的ID
 | results.img | `string` | 同行人图片的URL（锚点，代表性图片）
 | results.times | `int` | 对应img的人员和目标的同行次数
-| results.starttime | `int` | 同行开始时间
-| results.endtime | `int` | 同行结束时间
+| results.start_time | `int` | 同行开始时间
+| results.end_time | `int` | 同行结束时间
 | results.prob | `float` | 两人同行的概率
-| result.count | `int` | 目标和同行人的同行次数
-| results.src_img | `string` | 同行的某时刻的抓拍照
-| results.peer_img | `string` | 同行的某时刻的抓拍照
-| results.src_time | `string` | 同行的某时刻的目标者时间
-| results.peer_time | `string` | 同行的某时刻的同行人时间
-| results.camera_id | `string` | 在具体的哪一个摄像机下同行
+| results.detail | `Array<object>` | 两人同行的详细信息
+| results.detail.src_img | `string` | 同行的某时刻的目标抓拍照
+| results.detail.peer_img | `string` | 同行的某时刻的同行人抓拍照
+| results.detail.src_time | `string` | 同行的某时刻的目标抓拍时间
+| results.detail.peer_time | `string` | 同行的某时刻的同行人抓拍时间
+| results.detail.camera_id | `string` | 在具体的哪一个摄像机下同行
 
 ## 人像库
 
@@ -484,8 +484,8 @@
 |:---:|:---:|:---:|:---:|
 | repository_id | 是 | `string` | 人像库ID
 | images | 是 | `Array<Object>` | 图片数据
-| images.image_base64 | 是 | `String` | 图片base64编码
-| images.person_id | 是 | 人员的ID
+| images.image_base64 | 是 | `string` | 图片base64编码
+| images.person_id | 是 | `string` | 人员的ID
 
 **输出参数：**
 

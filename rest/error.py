@@ -30,6 +30,18 @@ SEARCH_ERR = {
     'null': 'search result is null'
 }
 
+PEER_ERR = {
+    'start': 'peer compute process has started',
+    'success': 'peer compute operation succeeded',
+    'fail': 'peer compute operation failed',
+    'query_not_exist': 'query task id is not exist',
+    'query_in_progress': 'query task is in progress',
+    'null': 'peer compute result is null',
+    'doing': 'query task is doing',
+    'done': 'query task has done',
+    'overdue': 'query task is overdue'
+}
+
 TRACE_ERR = {
     'time_format_err': 'start or end time format error, eg: 2018-01-01 01:01:01',
     'success': 'get trace success'

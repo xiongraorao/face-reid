@@ -15,7 +15,7 @@ if sup not in sys.path:
 
 from .error import *
 from .param_tool import check_param, update_param
-from util import Face, WeedClient
+from util import Face, WeedClient, base64_to_bytes
 from util import Log
 from util import Mysql
 from util import Faiss
@@ -280,6 +280,7 @@ def repos():
         logger.info('查询人像库成功')
         ret['message'] = REPO_ERR['success']
 
+
     logger.info('repository get all api return: ', ret)
     return json.dumps(ret)
 
@@ -308,7 +309,7 @@ def picture_add():
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
     data = update_param(default_params, data)
-    logger.debug('parameters: ', data)
+    logger.info('parameters: ', data)
 
     img_list = list(filter(lambda x: x.split('.')[-1] == 'jpg', os.listdir(data['path'])))
     img_list = list(map(lambda x: os.path.join(data['path'], x), img_list))
@@ -349,7 +350,57 @@ def picture_add():
 @repo.route('/picture/batch_image', methods=['POST'])
 def picture_add2():
     '''
-    通过base64编码导入
+    通过base64编码批量导入
     :return:
     '''
-    # todo 第二种导入方式
+    start = time.time()
+    data = request.data.decode('utf-8')
+    necessary_params = {'repository_id', 'images'}
+    default_params = {}
+    ret = {'time_used': 0, 'rtn': -1, 'id': -1}
+    # 检查json 格式
+    try:
+        data = json.loads(data)
+    except json.JSONDecodeError:
+        logger.warning(GLOBAL_ERR['json_syntax_err'])
+        ret['message'] = GLOBAL_ERR['json_syntax_err']
+        return json.dumps(ret)
+    legal = check_param(set(data), necessary_params, set(default_params))
+    if not legal:
+        logger.warning(GLOBAL_ERR['param_err'])
+        ret['message'] = GLOBAL_ERR['param_err']
+        return json.dumps(ret)
+    data = update_param(default_params, data)
+
+    person_ids = list(map(lambda x:x['person_id'], data['images']))
+    image_base64s = list(map(lambda x:x['image_base64'], data['images']))
+
+    urls = []
+    # upload to seaweed fs
+    for b64 in image_base64s:
+        assign = weed_client.assign()
+        upload_result = weed_client.upload(assign['url'], assign['fid'], base64_to_bytes(b64))
+        logger.info('upload result: ', upload_result)
+        url = 'http://' + assign['url'] + '/' + assign['fid']
+        urls.append(url)
+        logger.info('upload to seaweedFS with url: %s' % url)
+    assert len(image_base64s) == len(person_ids) == len(urls), '上传图片错误，或者参数长度不匹配'
+
+    # 将静态库数据写入mysql中
+    values = tuple(map(lambda x, y, z: (x, y, z), person_ids, urls, tuple(data['repository_id'] * len(image_base64s))))
+    sql = "insert into `t_person`(`person_id`, `uri`, `repository_id`) values {}".format(str(values)[1:-1])
+    insert_result = db.insert(sql)
+    if insert_result == -1:
+        logger.info('insert data into t_person error')
+        ret['message'] = REPO_ERR['fail']
+    else:
+        logger.info('insert data into t_person successfully')
+        ret['rtn'] = 0
+        ret['message'] = REPO_ERR['success']
+        ret['time_used'] = round((time.time() - start) * 1000)
+        db.commit()
+
+    # 启动一个线程完成静态库和动态库的关联过程
+    t = threading.Thread(target=contact, args=(data['repository_id']))
+    t.start()
+    return ret
