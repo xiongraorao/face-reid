@@ -31,13 +31,15 @@ db = Mysql(host=config.get('db', 'host'),
            db=config.get('db', 'db'),
            charset=config.get('db', 'charset'))
 db.set_logger(logger)
-
 search = Blueprint('search', __name__)
 
+searcher = Faiss(config.get('api', 'faiss_host'), config.getint('api', 'faiss_port'))
+face_tool = Face(config.get('api', 'face_server'))
 proc_pool = {}
 threshold = 0.75 # 用于过滤找到的topk人脸
 
-def search_proc(data, logger, query_id, start_time):
+
+def search_proc(data, logger, query_id):
     '''
     查询进程，异步查询结果，将结果写入数据库
     :param data:
@@ -45,39 +47,47 @@ def search_proc(data, logger, query_id, start_time):
     :return:
     '''
     # 1. 从索引接口中查询数据
-    # todo 修改搜索的相似度计算问题
-    searcher = Faiss(config.get('api', 'faiss_host'), config.getint('api', 'faiss_port'))
-    face_tool = Face(config.get('api', 'face_server'))
     feature = face_tool.feature(data['image_base64'])
     if feature is not None:
         logger.info('face feature extracted successfully')
         search_result = searcher.search(1, data['topk'] * 100, [feature]) # 这里默认平均每个cluster大小为100，这样的话，找出来的cluster的个数可能就接近topk
         if search_result['rtn'] == 0:
             logger.info('search successfully')
+            dist_lable = list(map(lambda x, y: (x, y), search_result['results']['distances'][0],
+                                  search_result['results']['lables'][0]))
             # 过滤掉低于给定阈值相似度的向量
-            # sim_ids = [] # 存储相似的抓拍人脸id
-            # sims = [] # 存储相似度的值
-            sims = {} # 存储相似人脸的id和对应的相似度
-            for i, distance in enumerate(search_result['results']['distances'][0]):
-                if distance >= threshold:
-                    sim_id = search_result['results']['labels'][0][i]
-                    sims[sim_id] = distance
-            logger.info('real topk is:', len(sims))
-            # todo 结合camera_ids的限制条件， t_cluster查询到cluster的id，然后返回出去
-            cluster_ids = []
-            face_image_uris = []
-            similarities = []
+            dist_lable = list(filter(lambda x: x[0] > threshold, dist_lable))
+            distances = list(map(lambda x: x[0], dist_lable))
+            lables = list(map(lambda x: x[1], dist_lable))
+            logger.info('real topk is:', len(lables))
             if data['camera_ids'] == 'all':
-                sql = "select `id`, `cluster_id`, `uri` from t_cluster where id in {} group by `cluster_id`".format(str(tuple(sims.keys())))
+                sql = "select `cluster_id` from t_cluster where id in {} ".format(str(tuple(lables)))
             else:
-                sql = "select `id`, `cluster_id`, `uri` from t_cluster where `id` in {} and `camera_id` in {} group by `cluster_id`".format(str(tuple(sims.keys())), str(tuple(data['camera_ids'])))
-            t_cluster_result = db.select(sql)
-            if t_cluster_result is not None and len(t_cluster_result) > 0:
+                sql = "select `cluster_id` from t_cluster where `id` in {} and `camera_id` in {} ".format(
+                    str(tuple(lables)), str(tuple(data['camera_ids'])))
+            select_result = db.select(sql)
+            if select_result is not None and len(select_result) > 0:
                 logger.info('select from t_cluster success')
-                temp_data = [ (x[1], x[2], sims[x[0]], query_id, start_time) for x in t_cluster_result ]
-                sql = "insert into `t_search` (cluster_id, face_image_uri, similarity, query_id, time) values {} ".format(str(tuple(temp_data))[1:-1])
+                clusters = list(map(lambda x: x[0], select_result))
+                assert len(clusters) == len(distances), 'cluster select error'
+
+                # 统计属于哪个cluster
+                cluster_dic = {}
+                for j in range(len(clusters)):
+                    if clusters[j] not in cluster_dic:
+                        cluster_dic[clusters[j]] = [lables[j]]
+                    else:
+                        cluster_dic[clusters[j]].append(lables[j])
+                for k, v in cluster_dic.items():
+                    cluster_dic[k] = sum(v) / len(v)  # 每个cluster和目标对应的平均相似度
+                # 按照value的值从大到小排序
+                cluster_sims = sorted(list(cluster_dic.items()), key=lambda x: x[1], reverse=True)
+                values = tuple(map(lambda x, y: (x[0], x[1], y), cluster_sims, [query_id] * len(cluster_sims)))
+                sql = "insert into `t_search` (`cluster_id`, `similarity`, `query_id`) values {} ".format(
+                    str(tuple(values))[1:-1])
                 insert_result = db.insert(sql)
                 if insert_result != -1:
+                    db.commit()
                     logger.info('insert to t_search success')
                 else:
                     logger.error('insert to t_search failed')
@@ -87,7 +97,7 @@ def search_proc(data, logger, query_id, start_time):
             logger.error('faiss searcher service error, error message: ', search_result['message'])
     else:
         logger.error('verifier service error')
-    logger.info('search process(%d) have done ', os.getpid())
+    logger.info('search process(%d) have done ' % os.getpid())
 
 
 @search.route('/all', methods=['POST'])
@@ -119,7 +129,7 @@ def search():
     # 1. 启动查询进程，将查询结果放到数据库中
     if data['query_id'] == -1: #第一次查询，启动查询进程
         query_id = round(time.time())
-        p = mp.Process(target=search_proc, args=(data, logger, query_id, query_id))
+        p = mp.Process(target=search_proc, args=(data, logger, query_id))
         p.daemon = True
         p.start()
         proc_pool[query_id] = p
@@ -138,37 +148,48 @@ def search():
             logger.info('query task 正在进行中')
             ret['rtn'] = -2
             ret['message'] = SEARCH_ERR['query_in_progress']
+            ret['status'] = SEARCH_ERR['doing']
         else:
             logger.info('query task 已经执行完毕')
-            sql = "select `cluster_id`, `face_image_uri`, `similarity` from `t_search` where `query_id` = %s  order by `similarity` desc limit %s,%s"
-            result = db.select(sql, (data['query_id'], data['start_pos'], data['limit']))
-            if result is None:
+            sql = "select e.cluster_id, e.anchor, e.similarity, f.person_id, f.repository_id, f.repo_name from" \
+                  "(select x.cluster_id, x.similarity , y.anchor from (select cluster_id, similarity from t_search where query_id = %s order by `similarity` desc limit %s,%s ) " \
+                  "x left join" \
+                  "(select a.cluster_id, a.uri anchor from t_cluster a inner join (select cluster_id, max(`timestamp`) `anchor_time` from t_cluster " \
+                  "group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time) y on x.cluster_id = y.cluster_id) e left join " \
+                  "(select c.id, c.name person_id, c.cluster_id, c.repository_id, d.name repo_name from " \
+                  "(select a.id,a.cluster_id, b.name, b.repository_id from (select id,cluster_id from t_contact) a left join t_person b on a.id = b.id ) c " \
+                  "left join t_lib d on c.repository_id = d.repository_id) f on e.cluster_id = f.cluster_id"
+            select_result = db.select(sql, (data['query_id'], data['start_pos'], data['limit']))
+            if select_result is None or len(select_result) == 0:
                 logger.info('mysql db select error, please check')
                 ret['rtn'] = -1
                 ret['query_id'] = data['query_id']
-                ret['message'] = SEARCH_ERR['fail']
+                ret['message'] = SEARCH_ERR['null']
             else:
-                logger.info('search success, length =', len(result))
+                logger.info('search success, length =', len(select_result))
                 ret['rtn'] = 0
                 ret['query_id'] = data['query_id']
-                ret['total'] = len(result)
-                results = []
-                for item in result:
-                    sql = "select x.id, t_person.repository_id t_lib.name from (select id from t_contact where cluster_id = %s) as x " \
-                          "left join t_person " \
-                          " on x.id = t_person.id left join t_lib on t_person.repository_id = t_lib.repository_id "
+                clusters = set(map(lambda x:x[0], select_result))
+                ret['total'] = len(clusters)
+                ret['message'] = SEARCH_ERR['success']
+                ret['status'] = SEARCH_ERR['done']
 
-                    sql2 = "select t_contact.id , t_person.repository_id, t_lib.name from t_contact, t_perosn, t_lib " \
-                           "where t_contact.cluster_id = %s and t_contact.id = t_person.id and t_person.repository_id = t_lib.repository_id"
-                    tmp_res = db.select(sql, (item[0]))
-                    tmp = {'cluster_id': item[0], 'face_image_uri': item[1], 'similarity': item[2]}
-                    if tmp_res is not None and len(tmp_res) > 0:
-                        logger.info('找到 cluster_id =', item[0], '所匹配的人像库信息')
-                        repository_infos = []
-                        for temp_item in tmp_res:
-                            repository_infos.append({'person_id': temp_item[0], 'repository_id': temp_item[1],'name': temp_item[2]})
-                        tmp['repository_infos'] = repository_infos
-                    results.append(tmp)
+                results = []
+                info = {}
+                for item in select_result:
+                    base_info = (item[0], item[1], item[2])
+                    if base_info not in info:
+                        info[base_info] = [(item[3], item[4], item[5])]
+                    else:
+                        info[base_info].append((item[3], item[4], item[5]))
+                for k,v in info.items():
+                    result = {'cluster_id': k[0], 'anchor_img': k[1], 'similarity': k[2]}
+                    repo_infos = []
+                    for i in v:
+                        repo_info = {'person_id': i[0], 'repository_id': i[1], 'name': i[2]}
+                        repo_infos.append(repo_info)
+                    result['repository_infos'] = repo_infos
+                    results.append(result)
                 ret['results'] = results
                 ret['time_used'] = round((time.time() - start) * 1000)
     logger.info('search1 api return: ', ret)
@@ -203,25 +224,20 @@ def search2():
 
     # todo 直接查询`t_person` 和 `t_contact`
     repository_ids = data['repository_ids']
-    sql = "select c.cluster_id, cl.uri, c.similarity, p.person_id, p.repository_id, lib.name from `t_person` as p where p.repository_id in {} limit {},{} " \
-          "left join `t_contact` as c on p.id = c.id " \
-          "left join `t_cluster` as cl on cl.cluster_id = c.cluser_id " \
-          "left join `t_lib` as lib on lib.repository_id = p.repository_id".format(str(tuple(repository_ids)), data['start_pos'], data['limit'])
+    sql = "select x.*, y.name repo_name from (" \
+          "select  e.cluster_id, e.similarity, f.anchor, e.person_id, e.repository_id from (select c.id, c.name person_id, c.repository_id, d.cluster_id, d.similarity from (select id, name, repository_id from t_person where repository_id in (1,2)) c" \
+          "left join t_contact d on c.id = d.id order by d.similarity desc) e  left join " \
+          "(select a.cluster_id, a.uri anchor from t_cluster a inner join (select cluster_id, max(`timestamp`) `anchor_time` from t_cluster " \
+          "group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time) f on e.cluster_id = f.cluster_id ) x left join" \
+          "t_lib y on x.repository_id = y.repository_id"
 
-    sql = "select p.id, p.repository_id, lib.name, con.cluster_id, clu.uri from (t_person p " \
-          "left join t_lib lib on p.repository_id = lib.repository_id where p.repository_id in {}) x " \
-          "left join (t_contact con left join t_cluster clu on clu.cluster_id = con.cluster_id) y on x.id = y.id" \
-
-    select_result = db.select(sql)
-    results = []
+    select_result = db.select(sql, str(tuple(repository_ids)))
     if select_result is not None and len(select_result) > 0:
         logger.info('select success, cluster size: ', len(select_result))
-        # 根据cluster来读取对应的信息
+        results = []
         for item in select_result:
-            tmp_result = {'cluster_id': item[0], 'face_image_uri': item[1], 'similarity': item[2]}
-            info = {'person_id': item[3], 'repository_id': item[4], 'name': item[5]}
-            tmp_result['repository_info'] = info
-            results.append(tmp_result)
+            result = {'cluster_id': item[0], 'anchor_img': item[1], 'similarity': item[2], 'repository_info': {'person_id': item[3], 'repository_id': item[4], 'name': item[5]}}
+            results.append(result)
         ret['rtn'] = 0
         ret['message'] = SEARCH_ERR['success']
         ret['query_id'] = -1
@@ -229,9 +245,10 @@ def search2():
         ret['total'] = len(select_result)
         ret['results'] = results
     else:
-        logger.info('repository is null or `t_contact` is null')
+        logger.info('repository is null or mysql db select error')
         ret['message'] = SEARCH_ERR['null']
         ret['rtn'] = -1
+        ret['query_id'] = -1
     logger.info('search2 api return: ', ret)
     return json.dumps(ret)
 
@@ -268,39 +285,44 @@ def search3():
     search_result = searcher.search(1, data['topk'] * 100, [feature])
     if search_result['rtn'] == 0:
         logger.info('search successfully')
+        dist_lable = list(map(lambda x, y: (x, y), search_result['results']['distances'][0],
+                              search_result['results']['lables'][0]))
         # 过滤掉低于给定阈值相似度的向量
-        # sim_ids = [] # 存储相似的抓拍人脸id
-        # sims = [] # 存储相似度的值
-        sims = {}  # 存储相似人脸的id和对应的相似度
-        for i, distance in enumerate(search_result['results']['distances'][0]):
-            if distance >= threshold:
-                sim_id = search_result['results']['labels'][0][i]
-                sims[sim_id] = distance
-        logger.info('real topk is:', len(sims))
-        sql = "select con.cluster_id, c.uri, con.similarity, p.person_id, p.respository_id, lib.name from t_person as p where p.id in {} " \
-              "left join t_contact as con on p.id = con.id " \
-              "left join t_cluster as c on c.cluster_id = con.cluster_id" \
-              "left join t_lib as lib on p.repository_id = lib.repository_id".format(str(tuple(sims.keys())))
+        dist_lable = list(filter(lambda x: x[0] > threshold, dist_lable))
+        distances = list(map(lambda x: x[0], dist_lable))
+        lables = list(map(lambda x: x[1], dist_lable))
+        logger.info('real topk is:', len(lables))
+
+        sql = "select g.cluster_id,g.anchor, g.similarity , g.name person_id, g.repository_id, h.name repo_name from (" \
+              "select e.* , f.name, f.repository_id from " \
+              "(select c.id, c.cluster_id,c.similarity, d.anchor from " \
+              "(select a.id, b.cluster_id, b.similarity from " \
+              "(select id from t_person where id in {} ) a " \
+              "left join t_contact b on a.id = b.id) c " \
+              "left join (select a.cluster_id, a.uri anchor from t_cluster a " \
+              "inner join (select cluster_id, max(`timestamp`) `anchor_time` from " \
+              "t_cluster group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time) d on c.cluster_id = d.cluster_id) e " \
+              "left join t_person f on e.id = f.id) g " \
+              "left join t_lib h on g.repository_id = h.repository_id order by g.similarity desc".format(
+            str(tuple(lables)))
         select_result = db.select(sql)
-        results = []
-        if select_result is not None and len(select_result) > 0:
-            logger.info('select success, cluster size: ', len(select_result))
-            # 根据cluster来读取对应的信息
+        if select_result is None or len(select_result) == 0:
+            logger.info('select from t_cluster failed or result is null')
+            ret['rtn'] = -1
+        else:
+            logger.info('select from t_cluster success, cluster size: ', len(select_result))
+            results = []
             for item in select_result:
-                tmp_result = {'cluster_id': item[0], 'face_image_uri': item[1], 'similarity': item[2]}
-                info = {'person_id': item[3], 'repository_id': item[4], 'name': item[5]}
-                tmp_result['repository_info'] = info
-                results.append(tmp_result)
+                result = {'cluster_id': item[0], 'anchor_img': item[1], 'similarity': item[2],
+                          'repository_info': {'person_id': item[3], 'repository_id': item[4], 'name': item[5]}}
+                results.append(result)
             ret['rtn'] = 0
+            clusters = set(map(lambda x:x[0], select_result))
+            ret['total'] = len(clusters)
             ret['message'] = SEARCH_ERR['success']
-            ret['query_id'] = -1
             ret['time_used'] = round((time.time() - start) * 1000)
             ret['total'] = len(select_result)
             ret['results'] = results
-        else:
-            logger.info('repository is null or `t_contact` is null')
-            ret['message'] = SEARCH_ERR['null']
-            ret['rtn'] = -1
     else:
         logger.info('search failed! please check faiss_lib_search service')
         ret['message'] = SEARCH_ERR['fail']

@@ -3,9 +3,9 @@ import json
 import os
 import sys
 import time
+from multiprocessing import Process
 
 from flask import Blueprint, request
-from multiprocessing import Process
 
 # get current file dir
 sup = os.path.dirname(os.path.realpath(__file__))
@@ -15,7 +15,7 @@ if sup not in sys.path:
 
 from .error import *
 from .param_tool import check_param, update_param, check_date
-from util import Log
+from util import Log, time_to_date
 from util import Mysql
 
 logger = Log('peer', 'logs/')
@@ -33,6 +33,7 @@ db.set_logger(logger)
 peer = Blueprint('peer', __name__)
 proc_pool = {}
 
+
 def compute(data, logger, query_id, start_time):
     '''
     同行人计算的进程，异步查询结果，将结果写入数据库
@@ -44,18 +45,101 @@ def compute(data, logger, query_id, start_time):
     '''
     # 1. 计算目标cluster的时间和摄像头
     if data['camera_ids'] != 'all':
-        sql = "select `timestamp`, `camera_id` from `t_cluster` where `cluster_id` = %s and `timestamp` between %s and %s and `camera_id` in {}".format(str(tuple(data['camera_ids'])))
+        sql = "select `timestamp`, `camera_id`, `uri` from `t_cluster` where `cluster_id` = %s and `timestamp` between %s and %s and `camera_id` in {}".format(
+            str(tuple(data['camera_ids'])))
     else:
-        sql = "select `timestamp`, `camera_id` from `t_cluster` where `cluster_id` = %s and `timestamp` between %s and %s "
+        sql = "select `timestamp`, `camera_id`, `uri` from `t_cluster` where `cluster_id` = %s and `timestamp` between %s and %s "
     select_result = db.select(sql, (data['cluster_id'], data['start'], data['end']))
     if select_result is None or len(select_result) == 0:
         logger.info('select from t_cluster error or result is null')
+        logger.info('peer compute process interrupt')
         return
     else:
         logger.info('select from t_cluster success')
-        timestamps = list(map(lambda x:x[0], select_result))
-        camera_ids = list(map(lambda x:x[1], select_result))
-        # todo 同行人算法
+        timestamps = list(map(lambda x: x[0], select_result))
+        camera_ids = list(map(lambda x: x[1], select_result))
+        src_imgs = list(map(lambda x: x[2], select_result))
+
+        # 同行人算法
+        peers_cluster_ids = []  # 在t_k 前后gap内，在C_k摄像头下面出现的cluster的集合的list
+        peers_timestamps = []
+        peers_uris = []
+        for i, t in enumerate(timestamps):
+            sql = "select `cluster_id`,`timestamp`,`uri` from `t_cluster` where `timestamp` between %s and %s and `camera_id` = %s"
+            t1 = time_to_date(t.timestamp() - data['gap'])
+            t2 = time_to_date(t.timestamp() + data['gap'])
+            result = db.select(sql, (t1, t2, camera_ids[i]))
+            temp_cluster = list(map(lambda x: x[0], result))
+            temp_time = list(map(lambda x: x[1], result))
+            temp_uri = list(map(lambda x: x[2], result))
+            peers_cluster_ids.append(temp_cluster)
+            peers_timestamps.append(temp_time)
+            peers_uris.append(temp_uri)
+
+        # 过滤掉重复的候选的cluster_ids
+        candidate_cids = set()
+        set(map(lambda x: candidate_cids.update(x), peers_cluster_ids))
+        for cluster_id in candidate_cids:
+            # 统计每个cluster的具体信息, 轨迹向量，轨迹图片，轨迹时间
+            trace_vector = []  # 候选cluster的轨迹向量
+            trace_img = []
+            trace_timestamp = []
+            # 需要返回的数据
+            peer_infos = []
+            for j, peer_cluster in enumerate(peers_cluster_ids):
+                if cluster_id in peer_cluster:
+                    trace_vector.append(1)
+                    trace_img.append(peers_uris[j])
+                    trace_timestamp.append(peers_timestamps[j])
+                else:
+                    trace_vector.append(0)
+                    trace_img.append('null')
+                    trace_timestamp.append('null')
+
+            prob = sum(trace_vector) / len(peers_cluster_ids)
+            if prob < data['threshold']:
+                logger.info('[cluster_id = %s] peer prob = %d , less than threshold' % (cluster_id, prob))
+                candidate_cids.remove(cluster_id)
+                continue
+            else:
+                logger.info('[cluster_id = %s] peer prob = %d , more than threshold' % (cluster_id, prob))
+                peer_info = {'cluster_id': cluster_id, 'times': sum(trace_vector),
+                             'start_time': peers_timestamps[trace_vector.index(1)],
+                             'end_time': peers_timestamps[trace_vector[::-1].index(1)]}
+                peer_details = []
+                for i, v in enumerate(trace_vector):
+                    if v == 1:  # 代表和目标相遇
+                        peer_detail = {'src_img': src_imgs[i], 'peer_img': trace_img[i], 'src_time': timestamps[i],
+                                       'peer_time': trace_timestamp[i], 'camera_id': camera_ids[i]}
+                        peer_details.append(peer_detail)
+                peer_info['detail'] = peer_details
+                peer_infos.append(peer_info)
+
+        total = len(peer_infos)  # total条数
+        # 写入t_peer 和 t_peer_detail数据库
+        for peer_info in peer_infos:
+            sql = "insert into `t_peeer`(`query_id`, `total`, `cluster_id`, `times`, `start_time`, `end_time`, `prob`)" \
+                  "values {}".format(str(tuple(
+                [data['query_id'], total, peer_info['cluster_id'], peer_info['times'], peer_info['start_time'],
+                 peer_info['end_time'], peer_info['prob']])))
+            insert_result = db.insert(sql)
+            if insert_result == -1:
+                logger.info('insert to t_peer error, please check')
+            else:
+                logger.info('insert to t_peer successfully, t_peer.id = %d' % insert_result)
+                db.commit()
+                logger.info('start insert peer_detail to t_peer_detail')
+                sql = "insert into `t_peer_detail` values {}".format(
+                    str(tuple([insert_result, peer_info['detail']['src_img'], peer_info['detail']['peer_img'],
+                               peer_info['detail']['src_time'], peer_info['detail']['peer_time'],
+                               peer_info['detail']['camera_id']])))
+                insert_result = db.insert(sql)
+                if insert_result == -1:
+                    logger.info('insert to t_peer_detail error, please check')
+                else:
+                    logger.info('insert to t_peer_detail successfully, t_peer.id = %d' % insert_result)
+                    db.commit()
+    logger.info('peer compute process(%d) has done' % os.getpid())
 
 
 @peer.route('/', methods=['POST'])
@@ -66,7 +150,7 @@ def peer():
     '''
     start = time.time()
     data = request.data.decode('utf-8')
-    necessary_params = {'cluster_id','start', 'end','gap','min_times','threshold', 'start_pos', 'limit'}
+    necessary_params = {'cluster_id', 'start', 'end', 'gap', 'min_times', 'threshold', 'start_pos', 'limit'}
     default_params = {'query_id': -1, 'camera_ids': 'all'}
     ret = {'time_used': 0, 'rtn': -1, 'query_id': -1}
     try:
@@ -122,7 +206,7 @@ def peer():
                   "(select cluster_id, max(`timestamp`) `anchor_time` from t_cluster group by cluster_id) b " \
                   "on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time) c where c.cluster_id = x.cluster_id"
             select_result = db.select(sql, (data['query_id'], data['start_pos'], data['limit']))
-            if select_result is None or len(select_result) ==0:
+            if select_result is None or len(select_result) == 0:
                 logger.info('select from t_peer error or result is null')
                 ret['rtn'] = -1
                 ret['query_id'] = data['query_id']
@@ -131,31 +215,30 @@ def peer():
                 logger.info('select from t_peer success')
                 ret['rtn'] = 0
                 ret['query_id'] = data['query_id']
+                clusters = set(map(lambda x:x[0], select_result))
+                ret['total'] = len(clusters)
                 ret['message'] = PEER_ERR['success']
                 ret['status'] = PEER_ERR['done']
-                cluster_ids = []
-                imgs = []
-                timess = []
-                start_times = []
-                end_times = []
-                probs = []
-                details = []
 
+                results = []
+                info = {}
                 for item in select_result:
-                    if item[0] not in cluster_ids:
-                        cluster_ids.append(item[0])
-                        imgs.append(item[1])
-                        timess.append(item[2])
-                        start_times.append(item[3])
-                        end_times.append(item[4])
-                        probs.append(item[5])
-                        detail = {'src_img': item[6], 'peer_img': item[7], 'src_time': item[8], 'peer_time': item[9], 'camera_id': item[10]}
-                        details.append(detail)
+                    base_info = (item[0], item[1], item[2], item[3], item[4], item[5])
+                    if base_info not in info:
+                        info[base_info] = [(item[6],item[7],item[8],item[9],item[10])]
                     else:
-                        detail = {'src_img': item[6], 'peer_img': item[7], 'src_time': item[8], 'peer_time': item[9], 'camera_id': item[10]}
+                        info[base_info].append((item[6],item[7],item[8],item[9],item[10]))
+
+                for k,v in info.items():
+                    result = {'cluster_id': k[0], 'anchor_img': k[1], 'times': k[2], 'start_time': k[3], 'end_time': k[4], 'prob': k[5]}
+                    details = []
+                    for item in v:
+                        detail = {'src_img': item[6], 'peer_img': item[7], 'src_time': item[8], 'peer_time': item[9],
+                                  'camera_id': item[10]}
                         details.append(detail)
-                ret['total'] = len(cluster_ids)
-                ret['results'] = {'img': imgs, 'times': timess, 'start_time': start_times, 'end_time': end_times, 'prob': probs,'detail': details}
+                    result['detail'] = details
+                    results.append(result)
+                ret['results'] = results
                 ret['time_used'] = round((time.time() - start) * 1000)
     logger.info('peer api return: ', ret)
     return json.dumps(ret)

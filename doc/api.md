@@ -152,9 +152,10 @@
 | message |	`string` | 请求执行状态描述
 | total | `int` | 总结果数
 | query_id | `string` | 查询请求的id
+| status | `string` | 任务状态
 | results | `Array<object>` | 检索的结果，按照平均相似度的高低来输出
 | results.cluster_id | `string` | 目标属于的类别ID
-| results.face_image_uri | `string` | 该类的锚点人脸图
+| results.anchor_img | `string` | 该类的锚点人脸图
 | results.similarity | `float` | 目标和该类的所有人脸的平均相似度
 | results.repository_infos | `Array<object>` | 关联到的静态库信息
 | results.repository_info.person_id | `string` | 人员id
@@ -192,7 +193,7 @@
 | query_id | `string` | 查询请求的id
 | results | `Array<object>` | 检索的结果，按照平均相似度的高低来输出
 | results.cluster_id | `string` | 目标属于的类别ID
-| results.face_image_uri | `string` | 该类的锚点人脸图
+| results.anchor_img | `string` | 该类的锚点人脸图
 | results.similarity | `float` | 目标和该类的所有人脸的平均相似度
 | results.repository_info | `object` | 关联到的静态库信息
 | results.repository_info.person_id | `string` | 人员id
@@ -229,7 +230,7 @@
 | query_id | `string` | 查询请求的id
 | results | `Array<object>` | 检索的结果，按照平均相似度的高低来输出
 | results.cluster_id | `string` | 目标属于的类别ID
-| results.face_image_uri | `string` | 该类的锚点人脸图
+| results.anchor_img | `string` | 该类的锚点人脸图
 | results.similarity | `float` | 目标和该类的所有人脸的平均相似度
 | results.repository_info | `object` | 关联到的静态库信息
 | results.repository_info.person_id | `string` | 人员id
@@ -338,7 +339,7 @@
 | status | `string` | 任务状态
 | results | `Array<object>` | 同行人查询结果
 | results.cluster_id | `string` | 同行人所在的类的ID
-| results.img | `string` | 同行人图片的URL（锚点，代表性图片）
+| results.anchor_img | `string` | 同行人图片的URL（锚点，代表性图片）
 | results.times | `int` | 对应img的人员和目标的同行次数
 | results.start_time | `int` | 同行开始时间
 | results.end_time | `int` | 同行结束时间

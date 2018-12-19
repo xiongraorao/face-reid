@@ -32,12 +32,11 @@ db = Mysql(host=config.get('db', 'host'),
            db=config.get('db', 'db'),
            charset=config.get('db', 'charset'))
 db.set_logger(logger)
+repo = Blueprint('repository', __name__)
+
 face_tool = Face(config.get('api', 'face_server'))
 searcher = Faiss(config.get('api', 'faiss_host'), config.getint('api', 'faiss_port'))
 weed_client = WeedClient(config.get('weed', 'host'), config.getint('weed', 'port'))
-
-repo = Blueprint('repository', __name__)
-
 threshold = 0.75  # 用于过滤找到的topk人脸
 topk = 100
 
@@ -101,26 +100,25 @@ def contact(repository_id):
                 distances = list(map(lambda x: x[0], dist_lable))
                 lables = list(map(lambda x: x[1], dist_lable))
                 # select cluster
-                t_sql = "select `cluster_id` from `t_cluster` where id in {} order by FIND_IN_FIRST(id,{}})" \
-                    .format(str(tuple(lables)), str(tuple(lables))[1:-1])
+                t_sql = "select `cluster_id` from `t_cluster` where id in {} ".format(str(tuple(lables)))
                 t_result = db.select(t_sql)
                 if t_result is None or len(t_result) == 0:
-                    logger.info('select t_cluster error or t_cluster is null')
+                    logger.info('select t_cluster error or t_cluster is null or person not match to t_cluster')
                 else:
                     logger.info('select t_cluster successfully')
                     clusters = list(map(lambda x: x[0], t_result))
                     assert len(clusters) == len(distances), 'cluster select error'
                     # 统计属于哪个cluster
                     cluster_dic = {}  # {'cluster': [d1， d2] }
-                    for i in range(len(clusters)):
-                        if clusters[i] not in cluster_dic:
-                            cluster_dic[clusters[i]] = [lables[i]]
+                    for j in range(len(clusters)):
+                        if clusters[j] not in cluster_dic:
+                            cluster_dic[clusters[j]] = [lables[j]]
                         else:
-                            cluster_dic[clusters[i]].append(lables[i])
+                            cluster_dic[clusters[j]].append(lables[j])
                     for k, v in cluster_dic.items():
                         cluster_dic[k] = sum(v) / len(v)  # 每个cluster和目标对应的平均相似度
                     cluster_id, sim = sorted(list(cluster_dic.items()), key=lambda x: x[1], reverse=True)[
-                        0]  # 按照value的值从小到大排序
+                        0]  # 按照value的值从大到小排序，取最大值
                     cluster_ids.append(cluster_id)
                     sims.append(sim)
 
@@ -280,7 +278,6 @@ def repos():
         logger.info('查询人像库成功')
         ret['message'] = REPO_ERR['success']
 
-
     logger.info('repository get all api return: ', ret)
     return json.dumps(ret)
 
@@ -372,8 +369,8 @@ def picture_add2():
         return json.dumps(ret)
     data = update_param(default_params, data)
 
-    person_ids = list(map(lambda x:x['person_id'], data['images']))
-    image_base64s = list(map(lambda x:x['image_base64'], data['images']))
+    person_ids = list(map(lambda x: x['person_id'], data['images']))
+    image_base64s = list(map(lambda x: x['image_base64'], data['images']))
 
     urls = []
     # upload to seaweed fs

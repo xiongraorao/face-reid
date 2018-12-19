@@ -44,21 +44,15 @@ CREATE TABLE IF NOT EXISTS `t_contact`(
   `id` INT PRIMARY KEY COMMENT 'person_id，用于和动态库关联',
   `cluster_id` VARCHAR(100) NOT NULL COMMENT '动态库的类ID',
   `similarity` FLOAT COMMENT '该person和cluster_id的相似度',
-#   `repository_id` INT UNIQUE COMMENT '人像库ID',
-#   `person_id` VARCHAR(100) COMMENT '人员ID(名字)',
   FOREIGN KEY (id) REFERENCES `t_person`(`id`) ON UPDATE CASCADE ON DELETE CASCADE
-#   FOREIGN KEY (repository_id) REFERENCES `t_lib`(`repository_id`) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
 # search 查询结果
 CREATE TABLE IF NOT EXISTS `t_search`(
   `id` INT PRIMARY KEY AUTO_INCREMENT,
-#   `total` INT COMMENT 'total result count',
   `cluster_id` VARCHAR(100) COMMENT '待查对象所属的类ID',
-  `face_image_uri` VARCHAR(100) COMMENT '类锚点人脸图的URI',
   `similarity` FLOAT COMMENT '相似度',
-  `query_id` INT COMMENT 'query_id, 用于找到结果',
-  `time` TIMESTAMP COMMENT '任务启动的时间'
+  `query_id` INT COMMENT 'query_id, 用于找到结果'
 );
 
 # trace 轨迹查询结果，速度够快的话，可以不用存结果到数据库

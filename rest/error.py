@@ -27,7 +27,10 @@ SEARCH_ERR = {
     'fail': 'search operation failed',
     'query_not_exist': 'query task id is not exist',
     'query_in_progress': 'query task is in progress',
-    'null': 'search result is null'
+    'null': 'search result is null',
+    'doing': 'query task is doing',
+    'done': 'query task has done',
+    'overdue': 'query task is overdue'
 }
 
 PEER_ERR = {
