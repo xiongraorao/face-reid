@@ -9,7 +9,7 @@ from .logger import Log
 
 
 class Grab():
-    def __init__(self, url, rate, use_gpu = False):
+    def __init__(self, url, rate, use_gpu = False, logger = None):
         '''
         # initErr:
         #       0:      success
@@ -35,7 +35,10 @@ class Grab():
         # char *input_filename, bool nobuffer, bool use_gpu, int timeout, [out] width, [out] height
         self.ffmpegPython.init.argtypes = [c_char_p, c_bool, c_bool, c_int, POINTER(c_int), POINTER(c_int)]
         self.ffmpegPython.init.restype = c_int
-        self.logger = Log('grab', is_save=False)
+        if logger is None:
+            self.logger = Log('grab', is_save=False)
+        else:
+            self.logger = logger
 
         # init ffmpeg
         width = c_int()

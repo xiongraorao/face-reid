@@ -5,7 +5,7 @@ LOG_FORMAT = "%(asctime)s (%(name)s) [%(levelname)s] %(message)s"
 DATE_FORMAT = "%m/%d/%Y %H:%M:%S"
 
 class Log:
-    def __init__(self, name, path='./', is_save = True, level=logging.INFO):
+    def __init__(self, name, path='./', is_save=True, level=logging.INFO):
         '''
         initialize logger, default output level is Warning
         :param name: logger programe name
@@ -21,24 +21,25 @@ class Log:
             self.logger.addHandler(file_handler)
 
     def debug(self, msg, *args):
+        msg = str(msg)
         for arg in args:
             msg += ' ' + str(arg)
         self.logger.debug(msg)
 
     def info(self, msg, *args):
+        msg = str(msg)
         for arg in args:
             msg += ' ' + str(arg)
         self.logger.info(msg)
 
     def warning(self, msg, *args):
+        msg = str(msg)
         for arg in args:
             msg += ' ' + str(arg)
         self.logger.warning(msg)
 
     def error(self, msg, *args):
+        msg = str(msg)
         for arg in args:
             msg += ' ' + str(arg)
         self.logger.error(msg)
-
-
-

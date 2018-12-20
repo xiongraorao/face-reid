@@ -15,7 +15,7 @@ if sup not in sys.path:
 
 from .error import *
 from .param_tool import check_param, update_param
-from util import Face, WeedClient, base64_to_bytes
+from util import Face, WeedClient, base64_to_bytes, trans_sqlin
 from util import Log
 from util import Mysql
 from util import Faiss
@@ -32,7 +32,7 @@ db = Mysql(host=config.get('db', 'host'),
            db=config.get('db', 'db'),
            charset=config.get('db', 'charset'))
 db.set_logger(logger)
-repo = Blueprint('repository', __name__)
+bp_repo = Blueprint('repository', __name__)
 
 face_tool = Face(config.get('api', 'face_server'))
 searcher = Faiss(config.get('api', 'faiss_host'), config.getint('api', 'faiss_port'))
@@ -100,7 +100,8 @@ def contact(repository_id):
                 distances = list(map(lambda x: x[0], dist_lable))
                 lables = list(map(lambda x: x[1], dist_lable))
                 # select cluster
-                t_sql = "select `cluster_id` from `t_cluster` where id in {} ".format(str(tuple(lables)))
+                t_sql = "select `cluster_id` from `t_cluster` where id in {} order by field (id, {})" \
+                    .format(trans_sqlin(lables), trans_sqlin(lables)[1:-1])
                 t_result = db.select(t_sql)
                 if t_result is None or len(t_result) == 0:
                     logger.info('select t_cluster error or t_cluster is null or person not match to t_cluster')
@@ -112,9 +113,9 @@ def contact(repository_id):
                     cluster_dic = {}  # {'cluster': [d1， d2] }
                     for j in range(len(clusters)):
                         if clusters[j] not in cluster_dic:
-                            cluster_dic[clusters[j]] = [lables[j]]
+                            cluster_dic[clusters[j]] = [distances[j]]
                         else:
-                            cluster_dic[clusters[j]].append(lables[j])
+                            cluster_dic[clusters[j]].append(distances[j])
                     for k, v in cluster_dic.items():
                         cluster_dic[k] = sum(v) / len(v)  # 每个cluster和目标对应的平均相似度
                     cluster_id, sim = sorted(list(cluster_dic.items()), key=lambda x: x[1], reverse=True)[
@@ -125,7 +126,7 @@ def contact(repository_id):
             # 4. 找到关系之后，插入contact表
             values = tuple(map(lambda x, y, z: (x, y, z), ids, cluster_ids, sims))
             t_sql = "insert into `t_contact`(`id`, `cluster_id`, `similarity`) values {}".format(
-                str(tuple(values))[1:-1])
+                trans_sqlin(values)[1:-1])
             insert_result = db.insert(t_sql)
             if insert_result == -1:
                 logger.info('insert data into t_contact error')
@@ -134,7 +135,7 @@ def contact(repository_id):
                 db.commit()
 
 
-@repo.route('/add', methods=['POST'])
+@bp_repo.route('/add', methods=['POST'])
 def repo_add():
     '''
     新建人像库
@@ -177,7 +178,7 @@ def repo_add():
     return json.dumps(ret)
 
 
-@repo.route('/del', methods=['POST'])
+@bp_repo.route('/del', methods=['POST'])
 def repo_del():
     '''
     删除人像库
@@ -219,7 +220,7 @@ def repo_del():
     return json.dumps(ret)
 
 
-@repo.route('/update', methods=['POST'])
+@bp_repo.route('/update', methods=['POST'])
 def repo_update():
     '''
     更新人像库
@@ -261,7 +262,7 @@ def repo_update():
     return json.dumps(ret)
 
 
-@repo.route('/get', methods=['GET'])
+@bp_repo.route('/get', methods=['GET'])
 def repos():
     '''
     获取所有的id库，以及库对应的人
@@ -282,7 +283,7 @@ def repos():
     return json.dumps(ret)
 
 
-@repo.route('/picture/batch_uri', methods=['POST'])
+@bp_repo.route('/picture/batch_uri', methods=['POST'])
 def picture_add():
     '''
     批量添加图片
@@ -344,7 +345,7 @@ def picture_add():
     return ret
 
 
-@repo.route('/picture/batch_image', methods=['POST'])
+@bp_repo.route('/picture/batch_image', methods=['POST'])
 def picture_add2():
     '''
     通过base64编码批量导入

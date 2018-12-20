@@ -99,7 +99,7 @@ class Face:
         extract_result = self.extract([cropped_img], [landmark])
         if extract_result['error_message'] != '701':
             return None
-        feature = extract_result['feature']
+        feature = extract_result['feature'][0]
         return feature
 
     def close(self):

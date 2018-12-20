@@ -30,10 +30,10 @@ db = Mysql(host=config.get('db', 'host'),
            charset=config.get('db', 'charset'))
 db.set_logger(logger)
 
-freq = Blueprint('freq', __name__)
+bp_freq = Blueprint('freq', __name__)
 
 
-@freq.route('/', methods=['POST'])
+@bp_freq.route('/', methods=['POST'])
 def freq():
     '''
     频次查询，查表

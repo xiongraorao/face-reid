@@ -309,7 +309,7 @@
 
 功能：输入目标cluster_id, 搜索这个cluster_id在限定时间和摄像头中的同行人
 
-请求地址：http://host:port/peers
+请求地址：http://host:port/peer
 请求方式：post
 请求类型：application/json
 

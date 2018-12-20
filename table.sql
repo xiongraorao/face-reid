@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS `t_camera`(
 # 动态库分类结果
 CREATE TABLE IF NOT EXISTS `t_cluster`(
   `id` INT PRIMARY KEY AUTO_INCREMENT COMMENT '人脸特征的索引ID, 样本ID',
-  `cluster_id` INT NOT NULL COMMENT '动态库聚类的ID',
+  `cluster_id` VARCHAR(100) NOT NULL COMMENT '动态库聚类的ID',
   `uri` VARCHAR(100) NOT NULL COMMENT '抓拍人员的URI',
   `timestamp` TIMESTAMP NOT NULL COMMENT '抓拍时间',
   `camera_id` INT NOT NULL COMMENT '抓拍摄像头的ID'
@@ -55,28 +55,28 @@ CREATE TABLE IF NOT EXISTS `t_search`(
   `query_id` INT COMMENT 'query_id, 用于找到结果'
 );
 
-# trace 轨迹查询结果，速度够快的话，可以不用存结果到数据库
-CREATE TABLE IF NOT EXISTS `t_trace`(
-  `query_id` INT PRIMARY KEY AUTO_INCREMENT COMMENT 'query task id',
-  `total` INT DEFAULT 0 COMMENT 'total result count',
-  `sample_id` INT COMMENT '某个抓拍的人的ID',
-  FOREIGN KEY (`sample_id`) REFERENCES `t_cluster`(`id`) ON UPDATE CASCADE ON DELETE CASCADE
-);
-
-# freq 频次查询结果，速度够快的话，可以不用存结果到数据库
-CREATE TABLE IF NOT EXISTS `t_freq`(
-  `query_id` INT PRIMARY KEY AUTO_INCREMENT COMMENT 'query task id',
-  `total` INT DEFAULT 0 COMMENT 'total result count',
-  `sample_id` INT COMMENT '某个抓拍的人的ID',
-  FOREIGN KEY (`sample_id`) REFERENCES `t_cluster`(`id`) ON UPDATE CASCADE ON DELETE CASCADE
-);
+# # trace 轨迹查询结果，速度够快的话，可以不用存结果到数据库
+# CREATE TABLE IF NOT EXISTS `t_trace`(
+#   `query_id` INT PRIMARY KEY AUTO_INCREMENT COMMENT 'query task id',
+#   `total` INT DEFAULT 0 COMMENT 'total result count',
+#   `sample_id` INT COMMENT '某个抓拍的人的ID',
+#   FOREIGN KEY (`sample_id`) REFERENCES `t_cluster`(`id`) ON UPDATE CASCADE ON DELETE CASCADE
+# );
+#
+# # freq 频次查询结果，速度够快的话，可以不用存结果到数据库
+# CREATE TABLE IF NOT EXISTS `t_freq`(
+#   `query_id` INT PRIMARY KEY AUTO_INCREMENT COMMENT 'query task id',
+#   `total` INT DEFAULT 0 COMMENT 'total result count',
+#   `sample_id` INT COMMENT '某个抓拍的人的ID',
+#   FOREIGN KEY (`sample_id`) REFERENCES `t_cluster`(`id`) ON UPDATE CASCADE ON DELETE CASCADE
+# );
 
 # 同行人
 CREATE TABLE IF NOT EXISTS `t_peer`(
   `id` INT PRIMARY KEY AUTO_INCREMENT COMMENT '标识查询结果',
   `query_id` INT COMMENT 'query_id, 用于查找结果',
   `total` INT DEFAULT 0 COMMENT 'total result count',
-  `cluster_id` INT COMMENT '和目标同行的cluster_id',
+  `cluster_id` VARCHAR(100) COMMENT '和目标同行的cluster_id',
   `times` INT COMMENT '目标人员和该cluster人员的同行次数',
   `start_time` TIMESTAMP COMMENT '开始同行时间',
   `end_time` TIMESTAMP COMMENT '结束同行时间',

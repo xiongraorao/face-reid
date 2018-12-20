@@ -6,12 +6,17 @@ import time
 import requests
 from flask import Flask
 
-from rest import camera
+from rest import bp_camera, bp_search, bp_peer, bp_freq, bp_repo, bp_trace
 from util import Log
 from util import Mysql
 
 app = Flask(__name__)
-app.register_blueprint(camera, url_prefix='/camera')
+app.register_blueprint(bp_camera, url_prefix='/camera')
+app.register_blueprint(bp_search, url_prefix='/search')
+app.register_blueprint(bp_peer, url_prefix='/peer')
+app.register_blueprint(bp_trace, url_prefix='/trace')
+app.register_blueprint(bp_freq, url_prefix='/freq')
+app.register_blueprint(bp_repo, url_prefix='/repository')
 
 # todo 初始化的时候，读取数据库中camera的状态，自动启动抓图进程
 

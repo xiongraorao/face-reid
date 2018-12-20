@@ -14,7 +14,7 @@ if sup not in sys.path:
 
 from .error import *
 from .param_tool import check_param, update_param, check_date
-from util import Log
+from util import Log, trans_sqlin
 from util import Mysql
 
 logger = Log('trace', 'logs/')
@@ -29,9 +29,9 @@ db = Mysql(host=config.get('db', 'host'),
            charset=config.get('db', 'charset'))
 db.set_logger(logger)
 
-trace = Blueprint('trace', __name__)
+bp_trace = Blueprint('trace', __name__)
 
-@trace.route('/', methods=['POST'])
+@bp_trace.route('/', methods=['POST'])
 def trace():
     '''
     判断轨迹，查表
@@ -68,7 +68,7 @@ def trace():
               "order by c.timestamp desc  limit %s, %s"
     else:
         sql = "select c.timestamp, c.uri, c.camera_id from `t_cluster` as c where c.cluster_id = %s and  c.timestamp between %s and %s and c.camera_id in {} " \
-              "order by c.timestamp desc limit %s, %s ".format(str(tuple(data['camera_ids'])))
+              "order by c.timestamp desc limit %s, %s ".format(trans_sqlin(data['camera_ids']))
     select_result = db.select(sql, (data['cluster_id'], data['start'], data['end'], data['start_pos'], data['limit']))
     if select_result is None or len(select_result) == 0:
         logger.info('select failed or result is null')

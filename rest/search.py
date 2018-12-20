@@ -8,6 +8,8 @@ import time
 from flask import Blueprint, request
 
 # get current file dir
+from util.tool import trans_sqlinsert
+
 sup = os.path.dirname(os.path.realpath(__file__))
 sup = os.path.dirname(sup)
 if sup not in sys.path:
@@ -15,7 +17,7 @@ if sup not in sys.path:
 
 from .error import *
 from .param_tool import check_param, update_param
-from util import Face
+from util import Face, trans_sqlin
 from util import Log
 from util import Mysql
 from util import Faiss
@@ -31,15 +33,15 @@ db = Mysql(host=config.get('db', 'host'),
            db=config.get('db', 'db'),
            charset=config.get('db', 'charset'))
 db.set_logger(logger)
-search = Blueprint('search', __name__)
+bp_search = Blueprint('search', __name__)
 
-searcher = Faiss(config.get('api', 'faiss_host'), config.getint('api', 'faiss_port'))
-face_tool = Face(config.get('api', 'face_server'))
+lib_searcher = Faiss(config.get('api', 'faiss_lib_host'), config.getint('api', 'faiss_lib_port'))
+
 proc_pool = {}
 threshold = 0.75 # 用于过滤找到的topk人脸
 
 
-def search_proc(data, logger, query_id):
+def search_proc(data, query_id):
     '''
     查询进程，异步查询结果，将结果写入数据库
     :param data:
@@ -47,6 +49,12 @@ def search_proc(data, logger, query_id):
     :return:
     '''
     # 1. 从索引接口中查询数据
+    start = time.time()
+    logger = Log('search-process', 'logs/')
+    logger.info('========================%s start ===================='%os.getpid())
+    logger.info('start search process, pid = %s' % os.getpid())
+    searcher = Faiss(config.get('api', 'faiss_host'), config.getint('api', 'faiss_port'))
+    face_tool = Face(config.get('api', 'face_server'))
     feature = face_tool.feature(data['image_base64'])
     if feature is not None:
         logger.info('face feature extracted successfully')
@@ -61,10 +69,11 @@ def search_proc(data, logger, query_id):
             lables = list(map(lambda x: x[1], dist_lable))
             logger.info('real topk is:', len(lables))
             if data['camera_ids'] == 'all':
-                sql = "select `cluster_id` from t_cluster where id in {} ".format(str(tuple(lables)))
+                sql = "select `cluster_id` from t_cluster where id in {} order by field (id, {}) " \
+                    .format(trans_sqlin(lables), trans_sqlin(lables)[1:-1])
             else:
-                sql = "select `cluster_id` from t_cluster where `id` in {} and `camera_id` in {} ".format(
-                    str(tuple(lables)), str(tuple(data['camera_ids'])))
+                sql = "select `cluster_id` from t_cluster where id in {} and `camera_id` in {} order by field (id, {}) " \
+                    .format(trans_sqlin(lables), trans_sqlin(data['camera_ids']), trans_sqlin(lables)[1:-1])
             select_result = db.select(sql)
             if select_result is not None and len(select_result) > 0:
                 logger.info('select from t_cluster success')
@@ -72,19 +81,20 @@ def search_proc(data, logger, query_id):
                 assert len(clusters) == len(distances), 'cluster select error'
 
                 # 统计属于哪个cluster
-                cluster_dic = {}
+                cluster_dic = {}  # cluster-> [distance1, distance2...]
                 for j in range(len(clusters)):
                     if clusters[j] not in cluster_dic:
-                        cluster_dic[clusters[j]] = [lables[j]]
+                        cluster_dic[clusters[j]] = [distances[j]]
                     else:
-                        cluster_dic[clusters[j]].append(lables[j])
+                        cluster_dic[clusters[j]].append(distances[j])
                 for k, v in cluster_dic.items():
                     cluster_dic[k] = sum(v) / len(v)  # 每个cluster和目标对应的平均相似度
                 # 按照value的值从大到小排序
                 cluster_sims = sorted(list(cluster_dic.items()), key=lambda x: x[1], reverse=True)
                 values = tuple(map(lambda x, y: (x[0], x[1], y), cluster_sims, [query_id] * len(cluster_sims)))
+                logger.info('values: ', values)
                 sql = "insert into `t_search` (`cluster_id`, `similarity`, `query_id`) values {} ".format(
-                    str(tuple(values))[1:-1])
+                    trans_sqlinsert(values))
                 insert_result = db.insert(sql)
                 if insert_result != -1:
                     db.commit()
@@ -97,10 +107,11 @@ def search_proc(data, logger, query_id):
             logger.error('faiss searcher service error, error message: ', search_result['message'])
     else:
         logger.error('verifier service error')
-    logger.info('search process(%d) have done ' % os.getpid())
+    time_used = round(time.time() - start)
+    logger.info('search process(%d) have done, cost time = %d s ' % (os.getpid(), time_used))
+    logger.info('========================%s start ===================='%os.getpid())
 
-
-@search.route('/all', methods=['POST'])
+@bp_search.route('/all', methods=['POST'])
 def search():
     '''
     人脸搜索，动态库检索
@@ -124,12 +135,12 @@ def search():
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
     data = update_param(default_params, data)
-    logger.info('parameters:', data)
+    logger.info('parameters:', str(data)[:100])
 
     # 1. 启动查询进程，将查询结果放到数据库中
     if data['query_id'] == -1: #第一次查询，启动查询进程
         query_id = round(time.time())
-        p = mp.Process(target=search_proc, args=(data, logger, query_id))
+        p = mp.Process(target=search_proc, args=(data, query_id))
         p.daemon = True
         p.start()
         proc_pool[query_id] = p
@@ -137,20 +148,22 @@ def search():
         ret['rtn'] = 0
         ret['message'] = SEARCH_ERR['start']
         ret['query_id'] = query_id
-        logger.info('启动search进程, process_key: ', query_id)
+        logger.info('启动search进程, process_key(query_id): ', query_id)
     else:
         # 2. 第二次查询
-        if data['query_id'] not in proc_pool:
+        tmp = db.select("select count(*) from t_search where query_id = %s", data['query_id'])
+        if data['query_id'] not in proc_pool and (tmp is None or tmp[0][0] == 0) :
             logger.info('query task %s 不存在'% data['query_id'])
             ret['rtn'] = -2
             ret['message'] = SEARCH_ERR['query_not_exist']
-        elif proc_pool[data['query_id']].is_alive():
+        elif data['query_id'] in proc_pool and proc_pool[data['query_id']].is_alive():
             logger.info('query task 正在进行中')
             ret['rtn'] = -2
             ret['message'] = SEARCH_ERR['query_in_progress']
             ret['status'] = SEARCH_ERR['doing']
         else:
             logger.info('query task 已经执行完毕')
+            # todo 检查这个语句的问题，出现了冗余数据
             sql = "select e.cluster_id, e.anchor, e.similarity, f.person_id, f.repository_id, f.repo_name from" \
                   "(select x.cluster_id, x.similarity , y.anchor from (select cluster_id, similarity from t_search where query_id = %s order by `similarity` desc limit %s,%s ) " \
                   "x left join" \
@@ -196,7 +209,7 @@ def search():
     return json.dumps(ret)
 
 
-@search.route('/repos', methods=['POST'])
+@bp_search.route('/repos', methods=['POST'])
 def search2():
     '''
     人脸搜索，静态库检索, 直接查找静态表
@@ -225,13 +238,13 @@ def search2():
     # todo 直接查询`t_person` 和 `t_contact`
     repository_ids = data['repository_ids']
     sql = "select x.*, y.name repo_name from (" \
-          "select  e.cluster_id, e.similarity, f.anchor, e.person_id, e.repository_id from (select c.id, c.name person_id, c.repository_id, d.cluster_id, d.similarity from (select id, name, repository_id from t_person where repository_id in (1,2)) c" \
+          "select  e.cluster_id, e.similarity, f.anchor, e.person_id, e.repository_id from (select c.id, c.name person_id, c.repository_id, d.cluster_id, d.similarity from (select id, name, repository_id from t_person where repository_id in {}) c" \
           "left join t_contact d on c.id = d.id order by d.similarity desc) e  left join " \
           "(select a.cluster_id, a.uri anchor from t_cluster a inner join (select cluster_id, max(`timestamp`) `anchor_time` from t_cluster " \
           "group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time) f on e.cluster_id = f.cluster_id ) x left join" \
-          "t_lib y on x.repository_id = y.repository_id"
+          "t_lib y on x.repository_id = y.repository_id".format(trans_sqlin(repository_ids))
 
-    select_result = db.select(sql, str(tuple(repository_ids)))
+    select_result = db.select(sql)
     if select_result is not None and len(select_result) > 0:
         logger.info('select success, cluster size: ', len(select_result))
         results = []
@@ -253,7 +266,7 @@ def search2():
     return json.dumps(ret)
 
 
-@search.route('/libs', methods=['POST'])
+@bp_search.route('/libs', methods=['POST'])
 def search3():
     '''
     在静态库中索引，然后关联到动态库，返回结果
@@ -279,10 +292,8 @@ def search3():
     data = update_param(default_params, data)
     logger.info('parameters:', data)
 
-    face_tool = Face(config.get('api', 'face_server'))
     feature = face_tool.feature(data['image_base64'])
-    searcher = Faiss(config.get('api', 'faiss_lib_host'), config.getint('api', 'faiss_lib_port'))
-    search_result = searcher.search(1, data['topk'] * 100, [feature])
+    search_result = lib_searcher.search(1, data['topk'] * 100, [feature])
     if search_result['rtn'] == 0:
         logger.info('search successfully')
         dist_lable = list(map(lambda x, y: (x, y), search_result['results']['distances'][0],
@@ -304,7 +315,7 @@ def search3():
               "t_cluster group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time) d on c.cluster_id = d.cluster_id) e " \
               "left join t_person f on e.id = f.id) g " \
               "left join t_lib h on g.repository_id = h.repository_id order by g.similarity desc".format(
-            str(tuple(lables)))
+            trans_sqlin(lables))
         select_result = db.select(sql)
         if select_result is None or len(select_result) == 0:
             logger.info('select from t_cluster failed or result is null')

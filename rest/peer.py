@@ -8,6 +8,8 @@ from multiprocessing import Process
 from flask import Blueprint, request
 
 # get current file dir
+from util.tool import trans_sqlinsert
+
 sup = os.path.dirname(os.path.realpath(__file__))
 sup = os.path.dirname(sup)
 if sup not in sys.path:
@@ -17,6 +19,7 @@ from .error import *
 from .param_tool import check_param, update_param, check_date
 from util import Log, time_to_date
 from util import Mysql
+from util import trans_sqlin
 
 logger = Log('peer', 'logs/')
 config = configparser.ConfigParser()
@@ -30,7 +33,7 @@ db = Mysql(host=config.get('db', 'host'),
            charset=config.get('db', 'charset'))
 db.set_logger(logger)
 
-peer = Blueprint('peer', __name__)
+bp_peer = Blueprint('peer', __name__)
 proc_pool = {}
 
 
@@ -46,7 +49,7 @@ def compute(data, logger, query_id, start_time):
     # 1. 计算目标cluster的时间和摄像头
     if data['camera_ids'] != 'all':
         sql = "select `timestamp`, `camera_id`, `uri` from `t_cluster` where `cluster_id` = %s and `timestamp` between %s and %s and `camera_id` in {}".format(
-            str(tuple(data['camera_ids'])))
+            trans_sqlin(data['camera_ids']))
     else:
         sql = "select `timestamp`, `camera_id`, `uri` from `t_cluster` where `cluster_id` = %s and `timestamp` between %s and %s "
     select_result = db.select(sql, (data['cluster_id'], data['start'], data['end']))
@@ -119,9 +122,9 @@ def compute(data, logger, query_id, start_time):
         # 写入t_peer 和 t_peer_detail数据库
         for peer_info in peer_infos:
             sql = "insert into `t_peeer`(`query_id`, `total`, `cluster_id`, `times`, `start_time`, `end_time`, `prob`)" \
-                  "values {}".format(str(tuple(
+                  "values {}".format(trans_sqlinsert(
                 [data['query_id'], total, peer_info['cluster_id'], peer_info['times'], peer_info['start_time'],
-                 peer_info['end_time'], peer_info['prob']])))
+                 peer_info['end_time'], peer_info['prob']]))
             insert_result = db.insert(sql)
             if insert_result == -1:
                 logger.info('insert to t_peer error, please check')
@@ -130,9 +133,9 @@ def compute(data, logger, query_id, start_time):
                 db.commit()
                 logger.info('start insert peer_detail to t_peer_detail')
                 sql = "insert into `t_peer_detail` values {}".format(
-                    str(tuple([insert_result, peer_info['detail']['src_img'], peer_info['detail']['peer_img'],
+                    trans_sqlinsert([insert_result, peer_info['detail']['src_img'], peer_info['detail']['peer_img'],
                                peer_info['detail']['src_time'], peer_info['detail']['peer_time'],
-                               peer_info['detail']['camera_id']])))
+                               peer_info['detail']['camera_id']]))
                 insert_result = db.insert(sql)
                 if insert_result == -1:
                     logger.info('insert to t_peer_detail error, please check')
@@ -142,7 +145,7 @@ def compute(data, logger, query_id, start_time):
     logger.info('peer compute process(%d) has done' % os.getpid())
 
 
-@peer.route('/', methods=['POST'])
+@bp_peer.route('/', methods=['POST'])
 def peer():
     '''
     查询同行人

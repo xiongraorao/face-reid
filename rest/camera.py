@@ -35,11 +35,11 @@ db = Mysql(host=config.get('db', 'host'),
            charset=config.get('db', 'charset'))
 db.set_logger(logger)
 
-camera = Blueprint('camera', __name__)
+bp_camera = Blueprint('camera', __name__)
 
 proc_pool = {}
 
-def grab_proc(url, rate, camera_id, logger):
+def grab_proc(url, rate, camera_id):
     '''
     抓图处理进程
     :param url:
@@ -48,7 +48,8 @@ def grab_proc(url, rate, camera_id, logger):
     :param logger:
     :return:
     '''
-    g = Grab(url, rate)
+    logger = Log('grab-proc'+ str(os.getpid()), 'logs/')
+    g = Grab(url, rate, logger=logger)
     # todo 根据g的 self.initErr 来判断摄像头的各种错误信息，需要操作数据库
     if g.initErr != 0:
         # 写入状态
@@ -113,7 +114,7 @@ def grab_proc(url, rate, camera_id, logger):
     logger.info('抓图进程终止')
 
 
-@camera.route('/add', methods=['POST'])
+@bp_camera.route('/add', methods=['POST'])
 def add():
     '''
     添加摄像头
@@ -157,7 +158,7 @@ def add():
         # 启动抓图进程
         if data['grab'] == 1:
             try:
-                p = mp.Process(target=grab_proc, args=(data['url'], data['rate'], camera_id, logger))
+                p = mp.Process(target=grab_proc, args=(data['url'], data['rate'], camera_id))
                 p.daemon = True
                 p.start()
                 proc_pool[camera_id] = p
@@ -178,7 +179,7 @@ def add():
     return json.dumps(ret)
 
 
-@camera.route('/del', methods=['POST'])
+@bp_camera.route('/del', methods=['POST'])
 def delete():
     '''
     删除摄像头
@@ -225,7 +226,7 @@ def delete():
     return json.dumps(ret)
 
 
-@camera.route('/update', methods=['POST'])
+@bp_camera.route('/update', methods=['POST'])
 def update():
     '''
     更新摄像头
@@ -268,7 +269,7 @@ def update():
 
         # 启动抓图进程
         if data['grab'] == 1:
-            p = mp.Process(target=grab_proc, args=(data['url'], data['rate'], camera_id, logger))
+            p = mp.Process(target=grab_proc, args=(data['url'], data['rate'], camera_id))
             p.daemon = True
             p.start()
             proc_pool[camera_id] = p
@@ -286,7 +287,7 @@ def update():
     return json.dumps(ret)
 
 
-@camera.route('/status', methods=['GET'])
+@bp_camera.route('/status', methods=['GET'])
 def state():
     '''
     查看摄像头状态
