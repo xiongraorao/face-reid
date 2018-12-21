@@ -301,6 +301,7 @@
 | rtn | `int` | 请求执行状态；0表示接收正常，非0表示接收异常
 | message |	`string` | 请求执行状态描述
 | total | `int` | 总结果数
+| query_id | `string` | 查询请求的id
 | resutls | `Array<Object>` | 频次查询的结果
 | results.date | `Date` | 输入时间范围内的日期，2018-08-09
 | results.times | `int` | 该cluster在该日期中出现的次数
@@ -336,6 +337,7 @@
 | rtn | `int` | 请求执行状态；0表示接收正常，非0表示接收异常
 | message |	`string` | 请求执行状态描述
 | total | `int` | 总结果数
+| query_id | `string` | 查询请求的id
 | status | `string` | 任务状态
 | results | `Array<object>` | 同行人查询结果
 | results.cluster_id | `string` | 同行人所在的类的ID

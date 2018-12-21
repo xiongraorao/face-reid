@@ -33,7 +33,7 @@ db.set_logger(logger)
 bp_freq = Blueprint('freq', __name__)
 
 
-@bp_freq.route('/', methods=['POST'])
+@bp_freq.route('/freq', methods=['POST'])
 def freq():
     '''
     频次查询，查表
@@ -67,7 +67,7 @@ def freq():
 
     if data['camera_ids'] == 'all':
         sql = "select timestamp from `t_cluster` where timestamp between %s and %s " \
-              "where cluster_id = %s order by timestamp desc limit %s, %s"
+              "and cluster_id = %s order by timestamp desc limit %s, %s"
         select_result = db.select(sql,
                                   (data['start'], data['end'], data['cluster_id'], data['start_pos'], data['limit']))
         if select_result is None or len(select_result) == 0:
@@ -78,8 +78,8 @@ def freq():
             raw_result = {}
             result = []
             for item in select_result:
-                t = time_to_date(item[0])
-                key = t[:10]  # 2018-12-14
+                # item 为datatime类型
+                key = str(item[0].date())  # 2018-12-14
                 raw_result[key] = 1 if key not in raw_result else raw_result[key] + 1
             for k, v in raw_result.items():
                 if v < data['freq']:
