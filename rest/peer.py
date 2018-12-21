@@ -207,7 +207,7 @@ def peer():
                   "inner join (" \
                   "select a.cluster_id, a.uri from t_cluster a inner join " \
                   "(select cluster_id, max(`timestamp`) `anchor_time` from t_cluster group by cluster_id) b " \
-                  "on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time) c where c.cluster_id = x.cluster_id"
+                  "on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time group by a.cluster_id) c where c.cluster_id = x.cluster_id"
             select_result = db.select(sql, (data['query_id'], data['start_pos'], data['limit']))
             if select_result is None or len(select_result) == 0:
                 logger.info('select from t_peer error or result is null')

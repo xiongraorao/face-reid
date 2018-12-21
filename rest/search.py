@@ -36,6 +36,7 @@ db.set_logger(logger)
 bp_search = Blueprint('search', __name__)
 
 lib_searcher = Faiss(config.get('api', 'faiss_lib_host'), config.getint('api', 'faiss_lib_port'))
+face_tool = Face(config.get('api', 'face_server'))
 
 proc_pool = {}
 threshold = 0.75 # 用于过滤找到的topk人脸
@@ -54,8 +55,8 @@ def search_proc(data, query_id):
     logger.info('========================%s start ===================='%os.getpid())
     logger.info('start search process, pid = %s' % os.getpid())
     searcher = Faiss(config.get('api', 'faiss_host'), config.getint('api', 'faiss_port'))
-    face_tool = Face(config.get('api', 'face_server'))
-    feature = face_tool.feature(data['image_base64'])
+    tool = Face(config.get('api', 'face_server'))
+    feature = tool.feature(data['image_base64'])
     if feature is not None:
         logger.info('face feature extracted successfully')
         search_result = searcher.search(1, data['topk'] * 100, [feature]) # 这里默认平均每个cluster大小为100，这样的话，找出来的cluster的个数可能就接近topk
@@ -163,12 +164,11 @@ def search():
             ret['status'] = SEARCH_ERR['doing']
         else:
             logger.info('query task 已经执行完毕')
-            # todo 检查这个语句的问题，出现了冗余数据
             sql = "select e.cluster_id, e.anchor, e.similarity, f.person_id, f.repository_id, f.repo_name from" \
                   "(select x.cluster_id, x.similarity , y.anchor from (select cluster_id, similarity from t_search where query_id = %s order by `similarity` desc limit %s,%s ) " \
                   "x left join" \
                   "(select a.cluster_id, a.uri anchor from t_cluster a inner join (select cluster_id, max(`timestamp`) `anchor_time` from t_cluster " \
-                  "group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time) y on x.cluster_id = y.cluster_id) e left join " \
+                  "group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time group by a.cluster_id ) y on x.cluster_id = y.cluster_id) e left join " \
                   "(select c.id, c.name person_id, c.cluster_id, c.repository_id, d.name repo_name from " \
                   "(select a.id,a.cluster_id, b.name, b.repository_id from (select id,cluster_id from t_contact) a left join t_person b on a.id = b.id ) c " \
                   "left join t_lib d on c.repository_id = d.repository_id) f on e.cluster_id = f.cluster_id"
@@ -241,7 +241,7 @@ def search2():
           "select  e.cluster_id, e.similarity, f.anchor, e.person_id, e.repository_id from (select c.id, c.name person_id, c.repository_id, d.cluster_id, d.similarity from (select id, name, repository_id from t_person where repository_id in {}) c" \
           "left join t_contact d on c.id = d.id order by d.similarity desc) e  left join " \
           "(select a.cluster_id, a.uri anchor from t_cluster a inner join (select cluster_id, max(`timestamp`) `anchor_time` from t_cluster " \
-          "group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time) f on e.cluster_id = f.cluster_id ) x left join" \
+          "group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time group by a.cluster_id) f on e.cluster_id = f.cluster_id ) x left join" \
           "t_lib y on x.repository_id = y.repository_id".format(trans_sqlin(repository_ids))
 
     select_result = db.select(sql)
@@ -312,7 +312,7 @@ def search3():
               "left join t_contact b on a.id = b.id) c " \
               "left join (select a.cluster_id, a.uri anchor from t_cluster a " \
               "inner join (select cluster_id, max(`timestamp`) `anchor_time` from " \
-              "t_cluster group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time) d on c.cluster_id = d.cluster_id) e " \
+              "t_cluster group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time group by a.cluster_id ) d on c.cluster_id = d.cluster_id) e " \
               "left join t_person f on e.id = f.id) g " \
               "left join t_lib h on g.repository_id = h.repository_id order by g.similarity desc".format(
             trans_sqlin(lables))
