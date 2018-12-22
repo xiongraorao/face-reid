@@ -31,7 +31,7 @@ db.set_logger(logger)
 
 bp_trace = Blueprint('trace', __name__)
 
-@bp_trace.route('/', methods=['POST'])
+@bp_trace.route('/trace', methods=['POST'])
 def trace():
     '''
     判断轨迹，查表
@@ -76,7 +76,7 @@ def trace():
         logger.info('select success')
         results = []
         for item in select_result:
-            result = {'grab_time': item[0], 'img': item[1], 'camera_id': item[2]}
+            result = {'grab_time': item[0].strftime('%Y-%m-%d %H:%M:%S'), 'img': item[1], 'camera_id': item[2]}
             results.append(result)
         if data['order'] == 2:
             # 按照时间正序输出

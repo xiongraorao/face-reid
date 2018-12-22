@@ -137,7 +137,7 @@
 | 参数名 | 是否必选 | 参数类型 | 参数说明
 |:---:|:---:|:---:|:---:|
 | image_base64 | 是	| `string` | 目标图片的Base64编码
-| query_id | 否	| `string`  | 结果翻页的时候, 使用这个 id 来查询, 缺省表示重新开启一个任务
+| query_id | 否	| `int`  | 结果翻页的时候, 使用这个 id 来查询, 缺省表示重新开启一个任务
 | start_pos | 是 | `int` | 从第几个开始返回
 | limit | 是 | `int` | 返回至多多少个结果
 | camera_ids | 否 | `Array<int>` | 关注的摄像头列表，默认为所有
@@ -151,7 +151,7 @@
 | rtn | `int` | 请求执行状态；0表示接收正常，非0表示接收异常
 | message |	`string` | 请求执行状态描述
 | total | `int` | 总结果数
-| query_id | `string` | 查询请求的id
+| query_id | `int` | 查询请求的id
 | status | `string` | 任务状态
 | results | `Array<object>` | 检索的结果，按照平均相似度的高低来输出
 | results.cluster_id | `string` | 目标属于的类别ID
@@ -176,7 +176,7 @@
 | 参数名 | 是否必选 | 参数类型 | 参数说明
 |:---:|:---:|:---:|:---:|
 | repository_ids | 是 | `Array<string>` | 静态库的ID列表
-| query_id | 否	| `string`  | 结果翻页的时候, 使用这个 id 来查询, 缺省表示重新开启一个任务
+| query_id | 否	| `int`  | 结果翻页的时候, 使用这个 id 来查询, 缺省表示重新开启一个任务
 | start_pos | 是 | `int` | 从第几个开始返回
 | limit | 是 | `int` | 返回至多多少个结果
 | camera_ids | 否 | `Array<int>` | 关注的摄像头列表，默认为所有
@@ -190,7 +190,7 @@
 | rtn | `int` | 请求执行状态；0表示接收正常，非0表示接收异常
 | message |	`string` | 请求执行状态描述
 | total | `int` | 总结果数
-| query_id | `string` | 查询请求的id
+| query_id | `int` | 查询请求的id
 | results | `Array<object>` | 检索的结果，按照平均相似度的高低来输出
 | results.cluster_id | `string` | 目标属于的类别ID
 | results.anchor_img | `string` | 该类的锚点人脸图
@@ -213,7 +213,7 @@
 | 参数名 | 是否必选 | 参数类型 | 参数说明
 |:---:|:---:|:---:|:---:|
 | image_base64 | 是 | `Array<string>` | 目标图片的Base64编码
-| query_id | 否	| `string`  | 结果翻页的时候, 使用这个 id 来查询, 缺省表示重新开启一个任务
+| query_id | 否	| `int`  | 结果翻页的时候, 使用这个 id 来查询, 缺省表示重新开启一个任务
 | start_pos | 是 | `int` | 从第几个开始返回
 | limit | 是 | `int` | 返回至多多少个结果
 | camera_ids | 否 | `Array<int>` | 关注的摄像头列表，默认为所有
@@ -227,7 +227,7 @@
 | rtn | `int` | 请求执行状态；0表示接收正常，非0表示接收异常
 | message |	`string` | 请求执行状态描述
 | total | `int` | 总结果数
-| query_id | `string` | 查询请求的id
+| query_id | `int` | 查询请求的id
 | results | `Array<object>` | 检索的结果，按照平均相似度的高低来输出
 | results.cluster_id | `string` | 目标属于的类别ID
 | results.anchor_img | `string` | 该类的锚点人脸图
@@ -253,7 +253,7 @@
 | start | 是 | `Datetime` | 目标轨迹开始时间，精确到秒
 | end | 是 | `Datetime` | 目标轨迹结束时间，精确到秒
 | camera_ids | 否 | `Array<int>` | 关注的摄像头列表，默认为所有
-| query_id | 否	| `string`  | 结果翻页的时候, 使用这个 id 来查询, 缺省表示重新开启一个任务
+| query_id | 否	| `int`  | 结果翻页的时候, 使用这个 id 来查询, 缺省表示重新开启一个任务
 | start_pos | 是 | `int` | 从第几个开始返回
 | limit | 是 | `int` | 返回至多多少个结果
 | order | 否	| `int` | 1按时间降序排列，2按时间升序排列，默认按时间降序排列
@@ -266,7 +266,7 @@
 | rtn | `int` | 请求执行状态；0表示接收正常，非0表示接收异常
 | message |	`string` | 请求执行状态描述
 | total | `int` | 总结果数
-| query_id | `string` | 查询请求的id
+| query_id | `int` | 查询请求的id
 | results | `Array<object>` | 轨迹查询的结果，根据时间排序输出
 | results.grab_time | `Datetime` | 抓拍的时间
 | results.img | `string` | 图片的URL
@@ -288,7 +288,7 @@
 | freq | 是 | `int` | 目标频次，大于该频次将被找到
 | start | 是 | `Datetime` | 目标频次统计开始时间，精确到秒
 | end | 是 | `Datetime` | 目标频次统计结束时间，精确到秒
-| query_id | 否 | `string` | 该请求任务ID，用于快速获取结果，不传参数则重新计算
+| query_id | 否 | `int` | 该请求任务ID，用于快速获取结果，不传参数则重新计算
 | start_pos | 是 | `int` | 从第几个开始返回
 | limit | 是 | `int` | 返回至多多少个结果
 | camera_ids | 否 | `Array<int>` | 关注的摄像头列表，默认为所有
@@ -301,7 +301,7 @@
 | rtn | `int` | 请求执行状态；0表示接收正常，非0表示接收异常
 | message |	`string` | 请求执行状态描述
 | total | `int` | 总结果数
-| query_id | `string` | 查询请求的id
+| query_id | `int` | 查询请求的id
 | resutls | `Array<Object>` | 频次查询的结果
 | results.date | `Date` | 输入时间范围内的日期，2018-08-09
 | results.times | `int` | 该cluster在该日期中出现的次数
@@ -321,7 +321,7 @@
 | cluster_id | 是 | `string` | 目标search之后，人为选择的cluster_id
 | start | 是 | `Datetime` | 目标频次统计开始时间，精确到秒
 | end | 是 | `Datetime` | 目标频次统计结束时间，精确到秒
-| query_id | 否 | `string` | 该请求任务ID，用于快速获取结果，不传参数则重新计算
+| query_id | 否 | `int` | 该请求任务ID，用于快速获取结果，不传参数则重新计算
 | gap | 是 | `int` | 和目标前后的时间间隔，用于判断是否同行，单位为秒
 | min_times | 是 | `int` | 最小同行次数，只输出同行次数超过该值的条目
 | threshold | 是 | `float` | 0-1之间，只输出同行概率大于该值的条目
@@ -337,7 +337,7 @@
 | rtn | `int` | 请求执行状态；0表示接收正常，非0表示接收异常
 | message |	`string` | 请求执行状态描述
 | total | `int` | 总结果数
-| query_id | `string` | 查询请求的id
+| query_id | `int` | 查询请求的id
 | status | `string` | 任务状态
 | results | `Array<object>` | 同行人查询结果
 | results.cluster_id | `string` | 同行人所在的类的ID

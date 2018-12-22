@@ -14,7 +14,7 @@ app = Flask(__name__)
 app.register_blueprint(bp_camera, url_prefix='/camera')
 app.register_blueprint(bp_search, url_prefix='/search')
 app.register_blueprint(bp_peer, url_prefix='/peer')
-app.register_blueprint(bp_trace, url_prefix='/trace')
+app.register_blueprint(bp_trace)
 app.register_blueprint(bp_freq)
 app.register_blueprint(bp_repo, url_prefix='/repository')
 
