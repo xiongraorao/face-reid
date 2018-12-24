@@ -8,8 +8,6 @@ import time
 from flask import Blueprint, request
 
 # get current file dir
-from util.tool import trans_sqlinsert
-
 sup = os.path.dirname(os.path.realpath(__file__))
 sup = os.path.dirname(sup)
 if sup not in sys.path:
@@ -17,7 +15,7 @@ if sup not in sys.path:
 
 from .error import *
 from .param_tool import check_param, update_param
-from util import Face, trans_sqlin
+from util import Face, trans_sqlin, trans_sqlinsert
 from util import Log
 from util import Mysql
 from util import Faiss

@@ -8,7 +8,6 @@ from multiprocessing import Process
 from flask import Blueprint, request
 
 # get current file dir
-from util.tool import trans_sqlinsert
 
 sup = os.path.dirname(os.path.realpath(__file__))
 sup = os.path.dirname(sup)
@@ -19,7 +18,7 @@ from .error import *
 from .param_tool import check_param, update_param, check_date
 from util import Log, time_to_date
 from util import Mysql
-from util import trans_sqlin
+from util import trans_sqlin, trans_sqlinsert
 
 logger = Log('peer', 'logs/')
 config = configparser.ConfigParser()

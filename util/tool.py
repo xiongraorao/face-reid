@@ -42,7 +42,7 @@ def trans_sqlinsert(x):
     :return:
     '''
     if x is None or len(x) == 0:
-        return -1
+        return None
     elif len(x) == 1:
         x = tuple(map(lambda a:tuple(a), x))
         return str(tuple(x))[1:-2]

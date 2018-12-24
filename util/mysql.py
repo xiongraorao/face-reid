@@ -65,7 +65,7 @@ class Mysql():
          :param args:
          :return: no
          '''
-        self.update(sql, args)
+        return self.update(sql, args)
 
     def update(self, sql, args=None):
         '''

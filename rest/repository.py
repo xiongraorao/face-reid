@@ -15,7 +15,7 @@ if sup not in sys.path:
 
 from .error import *
 from .param_tool import check_param, update_param
-from util import Face, WeedClient, base64_to_bytes, trans_sqlin
+from util import Face, WeedClient, base64_to_bytes, trans_sqlin, trans_sqlinsert
 from util import Log
 from util import Mysql
 from util import Faiss
@@ -41,6 +41,11 @@ threshold = 0.75  # 用于过滤找到的topk人脸
 topk = 100
 
 
+@bp_repo.route('/test', methods=['GET'])
+def test():
+    contact(5)
+    return 'ssss'
+
 def contact(repository_id):
     '''
     静态库和动态库的关联过程
@@ -60,20 +65,24 @@ def contact(repository_id):
         logger.info('selected %d items from t_person' % size)
         for item in select_result:
             b64 = get_as_base64(item[1])
-            detect_result = face_tool.detect(b64, 'portrait')
-            if detect_result['error_message'] != '601' or detect_result['detect_nums'] == 0:
-                logger.info('detect 0 face or detect error, error_code:', detect_result['error_message'])
+            if b64 is None:
+                logger.info('url is invalid or image server has down, please check seaweedfs')
+                continue
             else:
-                logger.info('detect %d face successfully' % detect_result['detect_nums'])
-                left = detect_result['detect'][0]['left']
-                top = detect_result['detect'][0]['top']
-                width = detect_result['detect'][0]['width']
-                height = detect_result['detect'][0]['height']
-                cropped_img = face_tool.crop(left, top, width, height, b64, True)
-                landmark = detect_result['detect'][0]['landmark']
-                img_base64.append(cropped_img)
-                landmarks.append(landmark)
-                ids.append(item[0])
+                detect_result = face_tool.detect(b64, 'portrait')
+                if detect_result['error_message'] != '601' or detect_result['detect_nums'] == 0:
+                    logger.info('detect 0 face or detect error, error_code:', detect_result['error_message'])
+                else:
+                    logger.info('detect %d face successfully' % detect_result['detect_nums'])
+                    left = detect_result['detect'][0]['left']
+                    top = detect_result['detect'][0]['top']
+                    width = detect_result['detect'][0]['width']
+                    height = detect_result['detect'][0]['height']
+                    cropped_img = face_tool.crop(left, top, width, height, b64, True)
+                    landmark = detect_result['detect'][0]['landmark']
+                    img_base64.append(cropped_img)
+                    landmarks.append(landmark)
+                    ids.append(item[0])
     # 2. 特征比对
     logger.info('start extract features in batch')
     extract_result = face_tool.extract(img_base64, landmarks)
@@ -126,10 +135,10 @@ def contact(repository_id):
             # 4. 找到关系之后，插入contact表
             values = tuple(map(lambda x, y, z: (x, y, z), ids, cluster_ids, sims))
             t_sql = "insert into `t_contact`(`id`, `cluster_id`, `similarity`) values {}".format(
-                trans_sqlin(values)[1:-1])
+                trans_sqlinsert(values))
             insert_result = db.insert(t_sql)
             if insert_result == -1:
-                logger.info('insert data into t_contact error')
+                logger.info('insert data into t_contact error, or insert values is null')
             else:
                 logger.info('insert data into t_contact successfully')
                 db.commit()
@@ -171,8 +180,9 @@ def repo_add():
     else:
         logger.info('添加人像库成功')
         ret['rtn'] = 0
-        ret['message'] = REPO_ERR['fail']
+        ret['message'] = REPO_ERR['success']
         ret['time_used'] = round((time.time() - start) * 1000)
+        db.commit()
 
     logger.info('repository add api return: ', ret)
     return json.dumps(ret)
@@ -204,7 +214,7 @@ def repo_del():
     data = update_param(default_params, data)
     logger.info('parameters:', data)
 
-    sql = "delete from `t_lib` where id = %s"
+    sql = "delete from `t_lib` where `repository_id` = %s"
     result = db.delete(sql, (data['id']))
     if result:
         logger.info('人像库删除成功')
@@ -246,7 +256,7 @@ def repo_update():
     data = update_param(default_params, data)
     logger.info('parameters:', data)
 
-    sql = "update `t_lib` set `name` = %s where id = %s"
+    sql = "update `t_lib` set `name` = %s where repository_id = %s"
     result = db.update(sql, (data['name'], data['id']))
     if result:
         logger.info('人像库更新成功')
@@ -262,7 +272,7 @@ def repo_update():
     return json.dumps(ret)
 
 
-@bp_repo.route('/get', methods=['GET'])
+@bp_repo.route('/repos', methods=['GET'])
 def repos():
     '''
     获取所有的id库，以及库对应的人
@@ -277,7 +287,14 @@ def repos():
         ret['message'] = REPO_ERR['fail']
     else:
         logger.info('查询人像库成功')
+        ret['rtn'] = 0
         ret['message'] = REPO_ERR['success']
+        repositories = []
+        for item in result:
+            repo = {'id': item[0], 'name': item[1], 'total': item[2]}
+            repositories.append(repo)
+        ret['repositories'] = repositories
+        ret['time_used'] = round((time.time() - start) * 1000)
 
     logger.info('repository get all api return: ', ret)
     return json.dumps(ret)
@@ -291,7 +308,7 @@ def picture_add():
     '''
     start = time.time()
     data = request.data.decode('utf-8')
-    necessary_params = {'repository_id', 'name', 'path'}
+    necessary_params = {'repository_id', 'path'}
     default_params = {}
     ret = {'time_used': 0, 'rtn': -1, 'id': -1}
     # 检查json 格式
@@ -315,7 +332,7 @@ def picture_add():
     person_ids = []  # person_id 人的名字
     for img in img_list:
         person_ids.append(os.path.split(img)[-1][:-4])
-        with open(img) as f:
+        with open(img, 'rb') as f:
             assign = weed_client.assign()
             upload_result = weed_client.upload(assign['url'], assign['fid'], f.read(), img)
             logger.info('upload result: ', upload_result)
@@ -326,8 +343,8 @@ def picture_add():
     assert len(img_list) == len(urls) == len(person_ids), '上传图片错误'
 
     # 将静态库数据写入mysql中
-    values = tuple(map(lambda x, y, z: (x, y, z), person_ids, urls, tuple(data['repository_id'] * len(img_list))))
-    sql = "insert into `t_person`(`person_id`, `uri`, `repository_id`) values {}".format(str(values)[1:-1])
+    values = tuple(map(lambda x, y, z: (x, y, z), person_ids, urls, tuple([data['repository_id']] * len(img_list))))
+    sql = "insert into `t_person`(`name`, `uri`, `repository_id`) values {}".format(trans_sqlinsert(values))
     insert_result = db.insert(sql)
     if insert_result == -1:
         logger.info('insert data into t_person error')
@@ -338,11 +355,11 @@ def picture_add():
         ret['message'] = REPO_ERR['success']
         ret['time_used'] = round((time.time() - start) * 1000)
         db.commit()
+        # 启动一个线程完成静态库和动态库的关联过程
+        t = threading.Thread(target=contact, args=(data['repository_id']))
+        t.start()
 
-    # 启动一个线程完成静态库和动态库的关联过程
-    t = threading.Thread(target=contact, args=(data['repository_id']))
-    t.start()
-    return ret
+    return json.dumps(ret)
 
 
 @bp_repo.route('/picture/batch_image', methods=['POST'])
@@ -386,7 +403,7 @@ def picture_add2():
 
     # 将静态库数据写入mysql中
     values = tuple(map(lambda x, y, z: (x, y, z), person_ids, urls, tuple(data['repository_id'] * len(image_base64s))))
-    sql = "insert into `t_person`(`person_id`, `uri`, `repository_id`) values {}".format(str(values)[1:-1])
+    sql = "insert into `t_person`(`person_id`, `uri`, `repository_id`) values {}".format(trans_sqlinsert(values))
     insert_result = db.insert(sql)
     if insert_result == -1:
         logger.info('insert data into t_person error')
@@ -401,4 +418,4 @@ def picture_add2():
     # 启动一个线程完成静态库和动态库的关联过程
     t = threading.Thread(target=contact, args=(data['repository_id']))
     t.start()
-    return ret
+    return json.dumps(ret)

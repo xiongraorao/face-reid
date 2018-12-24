@@ -378,7 +378,7 @@
 | time_used | `int` | 整个请求所花费的时间，单位为毫秒
 | rtn | `int` | 请求执行状态；0表示接收正常，非0表示接收异常
 | message |	`string` | 请求执行状态描述
-| id | `string` | 人像库的ID
+| id | `int` | 人像库的ID
 
 ### 删除
 
@@ -392,7 +392,7 @@
 
 | 参数名 | 是否必选 | 参数类型 | 参数说明
 |:---:|:---:|:---:|:---:|
-| id | 是 | `string` | 人像库ID
+| id | 是 | `int` | 人像库ID
 
 **输出参数：**
 
@@ -429,7 +429,7 @@
 
 查询人像库，得到所有的库的信息
 
-请求地址：http://host:port/repository/get
+请求地址：http://host:port/repository/repos
 请求方式：get
 请求类型：application/json
 
@@ -464,7 +464,6 @@
 | 参数名 | 是否必选 | 参数类型 | 参数说明
 |:---:|:---:|:---:|:---:|
 | repository_id | 是 | `string` | 人像库ID
-| name | 是 | `string` | 人像库的名称
 | path | 是 | `String` | 图片文件夹的路径
 
 **输出参数：**
