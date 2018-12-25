@@ -14,7 +14,7 @@ if sup not in sys.path:
     sys.path.append(sup)
 
 from .error import *
-from .param_tool import check_param, update_param
+from .param_tool import check_param_key, update_param
 from util import Face, WeedClient, base64_to_bytes, trans_sqlin, trans_sqlinsert
 from util import Log
 from util import Mysql
@@ -165,7 +165,7 @@ def repo_add():
         ret['message'] = GLOBAL_ERR['json_syntax_err']
         return json.dumps(ret)
 
-    legal = check_param(set(data), necessary_params, set(default_params))
+    legal = check_param_key(set(data), necessary_params, set(default_params))
     if not legal:
         logger.warning(GLOBAL_ERR['param_err'])
         ret['message'] = GLOBAL_ERR['param_err']
@@ -208,7 +208,7 @@ def repo_del():
         ret['message'] = GLOBAL_ERR['json_syntax_err']
         return json.dumps(ret)
 
-    legal = check_param(set(data), necessary_params, set(default_params))
+    legal = check_param_key(set(data), necessary_params, set(default_params))
     if not legal:
         logger.warning(GLOBAL_ERR['param_err'])
         ret['message'] = GLOBAL_ERR['param_err']
@@ -250,7 +250,7 @@ def repo_update():
         ret['message'] = GLOBAL_ERR['json_syntax_err']
         return json.dumps(ret)
 
-    legal = check_param(set(data), necessary_params, set(default_params))
+    legal = check_param_key(set(data), necessary_params, set(default_params))
     if not legal:
         logger.warning(GLOBAL_ERR['param_err'])
         ret['message'] = GLOBAL_ERR['param_err']
@@ -321,7 +321,7 @@ def picture_add():
         logger.warning(GLOBAL_ERR['json_syntax_err'])
         ret['message'] = GLOBAL_ERR['json_syntax_err']
         return json.dumps(ret)
-    legal = check_param(set(data), necessary_params, set(default_params))
+    legal = check_param_key(set(data), necessary_params, set(default_params))
     if not legal:
         logger.warning(GLOBAL_ERR['param_err'])
         ret['message'] = GLOBAL_ERR['param_err']
@@ -383,7 +383,7 @@ def picture_add2():
         logger.warning(GLOBAL_ERR['json_syntax_err'])
         ret['message'] = GLOBAL_ERR['json_syntax_err']
         return json.dumps(ret)
-    legal = check_param(set(data), necessary_params, set(default_params))
+    legal = check_param_key(set(data), necessary_params, set(default_params))
     if not legal:
         logger.warning(GLOBAL_ERR['param_err'])
         ret['message'] = GLOBAL_ERR['param_err']

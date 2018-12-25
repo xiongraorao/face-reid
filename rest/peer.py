@@ -15,7 +15,7 @@ if sup not in sys.path:
     sys.path.append(sup)
 
 from .error import *
-from .param_tool import check_param, update_param, check_date
+from .param_tool import check_param_key, update_param, check_date
 from util import Log, time_to_date
 from util import Mysql
 from util import trans_sqlin, trans_sqlinsert
@@ -162,7 +162,7 @@ def peer():
         ret['message'] = GLOBAL_ERR['json_syntax_err']
         return json.dumps(ret)
 
-    legal = check_param(set(data), necessary_params, set(default_params))
+    legal = check_param_key(set(data), necessary_params, set(default_params))
     if not legal:
         logger.warning(GLOBAL_ERR['param_err'])
         ret['message'] = GLOBAL_ERR['param_err']
