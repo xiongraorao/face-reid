@@ -36,25 +36,22 @@ bp_repo = Blueprint('repository', __name__)
 
 face_tool = Face(config.get('api', 'face_server'))
 searcher = Faiss(config.get('api', 'faiss_host'), config.getint('api', 'faiss_port'))
+lib_searcher = Faiss(config.get('api', 'faiss_lib_host'), config.getint('api', 'faiss_lib_port'))
 weed_client = WeedClient(config.get('weed', 'host'), config.getint('weed', 'port'))
 threshold = 0.75  # 用于过滤找到的topk人脸
 topk = 100
 
 
-@bp_repo.route('/test', methods=['GET'])
-def test():
-    contact(5)
-    return 'ssss'
-
-def contact(repository_id):
+def contact(start_id, length):
     '''
     静态库和动态库的关联过程
-    :param repository_id:
+    :param start_id: t_person 表上次插入的开始位置
+    :param length: t_person 表上次插入的长度
     :return:
     '''
     # 1. 查询数据库
-    sql = "select `id`, `uri` from `t_person` where `repository_id` = %s "
-    select_result = db.select(sql, repository_id)
+    sql = "select `id`, `uri` from `t_person` where id between %s and %s"
+    select_result = db.select(sql, (start_id, start_id + length -1))
     ids = []
     img_base64 = []
     landmarks = []
@@ -93,6 +90,11 @@ def contact(repository_id):
         assert len(features) == len(ids), 'extract feature error, not exactly'
         logger.info('extract features successfully, count = %d' % len(features))
 
+        # 插入静态库
+        logger.info('add vectors to lib-faiss')
+        add_result = lib_searcher.add(len(ids), ids, features)
+        logger.info('add result: ', add_result)
+
         # 3. 向动态库检索
         logger.info('start search in index server, topk = %d' % topk)
         search_result = searcher.search(len(features), topk, features)
@@ -114,6 +116,7 @@ def contact(repository_id):
                 t_result = db.select(t_sql)
                 if t_result is None or len(t_result) == 0:
                     logger.info('select t_cluster error or t_cluster is null or person not match to t_cluster')
+                    ids.pop(i) # 去掉不合格的id，否则后面insert的id对应错误
                 else:
                     logger.info('select t_cluster successfully')
                     clusters = list(map(lambda x: x[0], t_result))
@@ -356,7 +359,7 @@ def picture_add():
         ret['time_used'] = round((time.time() - start) * 1000)
         db.commit()
         # 启动一个线程完成静态库和动态库的关联过程
-        t = threading.Thread(target=contact, args=(data['repository_id']))
+        t = threading.Thread(target=contact, args=(insert_result,len(values)))
         t.start()
 
     return json.dumps(ret)
@@ -402,8 +405,8 @@ def picture_add2():
     assert len(image_base64s) == len(person_ids) == len(urls), '上传图片错误，或者参数长度不匹配'
 
     # 将静态库数据写入mysql中
-    values = tuple(map(lambda x, y, z: (x, y, z), person_ids, urls, tuple(data['repository_id'] * len(image_base64s))))
-    sql = "insert into `t_person`(`person_id`, `uri`, `repository_id`) values {}".format(trans_sqlinsert(values))
+    values = tuple(map(lambda x, y, z: (x, y, z), person_ids, urls, tuple([data['repository_id']] * len(image_base64s))))
+    sql = "insert into `t_person`(`name`, `uri`, `repository_id`) values {}".format(trans_sqlinsert(values))
     insert_result = db.insert(sql)
     if insert_result == -1:
         logger.info('insert data into t_person error')
@@ -416,6 +419,6 @@ def picture_add2():
         db.commit()
 
     # 启动一个线程完成静态库和动态库的关联过程
-    t = threading.Thread(target=contact, args=(data['repository_id']))
+    t = threading.Thread(target=contact, args=(data['repository_id'],))
     t.start()
     return json.dumps(ret)

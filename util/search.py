@@ -19,7 +19,6 @@ class Search():
         :return:
         '''
         url = 'http://' + self.host + ':' + str(self.port) + '/add'
-        print(url)
         n = len(vectors)
         if len(ids) != n:
             print('parameters error!')
@@ -47,7 +46,6 @@ class Search():
             q[i] = queries[i]
         data_request = {'qtotal': qtotal, 'topk': topk, 'queries': q}
         response = requests.post(url, data=json.dumps(data_request), headers=headers)
-        print(response)
         text = response.json()
         return text
 
@@ -73,7 +71,6 @@ class Search():
         data_request = json.dumps({'start': start, 'end': end})
         response = requests.post(url, data=data_request, headers=headers)
         text = json.loads(response.text)
-        print(text)
         return text
 
     def reconfig(self, path):
@@ -105,7 +102,6 @@ class Search():
         data_request = json.dumps(data_request)
         response = requests.post(url, data=data_request, headers=headers)
         text = response.json()  # json.loads(response.text)
-        # print(text)
         return text
 
 class Faiss():

@@ -159,7 +159,7 @@
 | results.similarity | `float` | 目标和该类的所有人脸的平均相似度
 | results.repository_infos | `Array<object>` | 关联到的静态库信息
 | results.repository_info.person_id | `string` | 人员id
-| results.repository_info.repository_id | `string` | 人像库id
+| results.repository_info.repository_id | `int` | 人像库id
 | results.repository_info.name | `string` | 人像库名称
 
 
@@ -175,7 +175,7 @@
 
 | 参数名 | 是否必选 | 参数类型 | 参数说明
 |:---:|:---:|:---:|:---:|
-| repository_ids | 是 | `Array<string>` | 静态库的ID列表
+| repository_ids | 是 | `Array<int>` | 静态库的ID列表
 | query_id | 否	| `int`  | 结果翻页的时候, 使用这个 id 来查询, 缺省表示重新开启一个任务
 | start_pos | 是 | `int` | 从第几个开始返回
 | limit | 是 | `int` | 返回至多多少个结果
@@ -197,7 +197,7 @@
 | results.similarity | `float` | 目标和该类的所有人脸的平均相似度
 | results.repository_info | `object` | 关联到的静态库信息
 | results.repository_info.person_id | `string` | 人员id
-| results.repository_info.repository_id | `string` | 人像库id
+| results.repository_info.repository_id | `int` | 人像库id
 | results.repository_info.name | `string` | 人像库名称
 
 ### 搜索3
@@ -234,7 +234,7 @@
 | results.similarity | `float` | 目标和该类的所有人脸的平均相似度
 | results.repository_info | `object` | 关联到的静态库信息
 | results.repository_info.person_id | `string` | 人员id
-| results.repository_info.repository_id | `string` | 人像库id
+| results.repository_info.repository_id | `int` | 人像库id
 | results.repository_info.name | `string` | 人像库名称
 
 ## 轨迹查询
@@ -463,7 +463,7 @@
 
 | 参数名 | 是否必选 | 参数类型 | 参数说明
 |:---:|:---:|:---:|:---:|
-| repository_id | 是 | `string` | 人像库ID
+| repository_id | 是 | `int` | 人像库ID
 | path | 是 | `String` | 图片文件夹的路径
 
 **输出参数：**
@@ -484,7 +484,7 @@
 
 | 参数名 | 是否必选 | 参数类型 | 参数说明
 |:---:|:---:|:---:|:---:|
-| repository_id | 是 | `string` | 人像库ID
+| repository_id | 是 | `int` | 人像库ID
 | images | 是 | `Array<Object>` | 图片数据
 | images.image_base64 | 是 | `string` | 图片base64编码
 | images.person_id | 是 | `string` | 人员的ID

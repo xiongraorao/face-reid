@@ -162,14 +162,16 @@ def search():
             ret['status'] = SEARCH_ERR['doing']
         else:
             logger.info('query task 已经执行完毕')
-            sql = "select e.cluster_id, e.anchor, e.similarity, f.person_id, f.repository_id, f.repo_name from" \
-                  "(select x.cluster_id, x.similarity , y.anchor from (select cluster_id, similarity from t_search where query_id = %s order by `similarity` desc limit %s,%s ) " \
-                  "x left join" \
-                  "(select a.cluster_id, a.uri anchor from t_cluster a inner join (select cluster_id, max(`timestamp`) `anchor_time` from t_cluster " \
-                  "group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time group by a.cluster_id ) y on x.cluster_id = y.cluster_id) e left join " \
-                  "(select c.id, c.name person_id, c.cluster_id, c.repository_id, d.name repo_name from " \
-                  "(select a.id,a.cluster_id, b.name, b.repository_id from (select id,cluster_id from t_contact) a left join t_person b on a.id = b.id ) c " \
-                  "left join t_lib d on c.repository_id = d.repository_id) f on e.cluster_id = f.cluster_id"
+            sql = '''
+            select e.cluster_id, e.anchor, e.similarity, f.person_id, f.repository_id, f.repo_name from
+            (select x.cluster_id, x.similarity , y.anchor from (select cluster_id, similarity from t_search where query_id = %s order by `similarity` desc limit %s,%s ) 
+            x left join
+            (select a.cluster_id, a.uri anchor from t_cluster a inner join (select cluster_id, max(`timestamp`) `anchor_time` from t_cluster 
+            group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time group by a.cluster_id ) y on x.cluster_id = y.cluster_id) e left join 
+            (select c.id, c.name person_id, c.cluster_id, c.repository_id, d.name repo_name from 
+            (select a.id,a.cluster_id, b.name, b.repository_id from (select id,cluster_id from t_contact) a left join t_person b on a.id = b.id ) c 
+            left join t_lib d on c.repository_id = d.repository_id) f on e.cluster_id = f.cluster_id
+            '''
             select_result = db.select(sql, (data['query_id'], data['start_pos'], data['limit']))
             if select_result is None or len(select_result) == 0:
                 logger.info('mysql db select error, please check')
@@ -235,12 +237,16 @@ def search2():
 
     # todo 直接查询`t_person` 和 `t_contact`
     repository_ids = data['repository_ids']
-    sql = "select x.*, y.name repo_name from (" \
-          "select  e.cluster_id, e.similarity, f.anchor, e.person_id, e.repository_id from (select c.id, c.name person_id, c.repository_id, d.cluster_id, d.similarity from (select id, name, repository_id from t_person where repository_id in {}) c" \
-          "left join t_contact d on c.id = d.id order by d.similarity desc) e  left join " \
-          "(select a.cluster_id, a.uri anchor from t_cluster a inner join (select cluster_id, max(`timestamp`) `anchor_time` from t_cluster " \
-          "group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time group by a.cluster_id) f on e.cluster_id = f.cluster_id ) x left join" \
-          "t_lib y on x.repository_id = y.repository_id".format(trans_sqlin(repository_ids))
+    sql = '''
+    select x.*, y.name repo_name from (
+    select  e.cluster_id, e.similarity, f.anchor, e.person_id, e.repository_id from (
+    select c.id, c.name person_id, c.repository_id, d.cluster_id, d.similarity from (
+    select id, name, repository_id from t_person where repository_id in {} limit {},{}) c
+    left join t_contact d on c.id = d.id order by d.similarity desc) e  left join 
+    (select a.cluster_id, a.uri anchor from t_cluster a inner join (select cluster_id, max(`timestamp`) `anchor_time` from t_cluster 
+    group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time group by a.cluster_id) f on e.cluster_id = f.cluster_id ) x left join
+    t_lib y on x.repository_id = y.repository_id
+    '''.format(trans_sqlin(repository_ids), data['start_pos'], data['limit'])
 
     select_result = db.select(sql)
     if select_result is not None and len(select_result) > 0:
@@ -302,22 +308,25 @@ def search3():
         lables = list(map(lambda x: x[1], dist_lable))
         logger.info('real topk is:', len(lables))
 
-        sql = "select g.cluster_id,g.anchor, g.similarity , g.name person_id, g.repository_id, h.name repo_name from (" \
-              "select e.* , f.name, f.repository_id from " \
-              "(select c.id, c.cluster_id,c.similarity, d.anchor from " \
-              "(select a.id, b.cluster_id, b.similarity from " \
-              "(select id from t_person where id in {} ) a " \
-              "left join t_contact b on a.id = b.id) c " \
-              "left join (select a.cluster_id, a.uri anchor from t_cluster a " \
-              "inner join (select cluster_id, max(`timestamp`) `anchor_time` from " \
-              "t_cluster group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time group by a.cluster_id ) d on c.cluster_id = d.cluster_id) e " \
-              "left join t_person f on e.id = f.id) g " \
-              "left join t_lib h on g.repository_id = h.repository_id order by g.similarity desc".format(
-            trans_sqlin(lables))
+        sql = '''
+        select g.cluster_id, g.anchor, g.similarity, g.name person_id, g.repository_id, h.name repo_name from (
+        select e.* , f.name, f.repository_id from 
+        (select c.id, c.cluster_id,c.similarity, d.anchor from 
+        (select a.id, b.cluster_id, b.similarity from 
+        (select id from t_person where id in {} limit {},{} ) a 
+        left join t_contact b on a.id = b.id) c 
+        left join (select a.cluster_id, a.uri anchor from t_cluster a 
+        inner join (select cluster_id, max(`timestamp`) `anchor_time` from 
+        t_cluster group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time group by a.cluster_id ) d 
+        on c.cluster_id = d.cluster_id) e 
+        left join t_person f on e.id = f.id) g 
+        left join t_lib h on g.repository_id = h.repository_id order by g.similarity desc
+        '''.format(trans_sqlin(lables), data['start_pos'], data['limit'])
+
         select_result = db.select(sql)
         if select_result is None or len(select_result) == 0:
             logger.info('select from t_cluster failed or result is null')
-            ret['rtn'] = -1
+            ret['rtn'] = -2
         else:
             logger.info('select from t_cluster success, cluster size: ', len(select_result))
             results = []
@@ -334,8 +343,8 @@ def search3():
             ret['results'] = results
     else:
         logger.info('search failed! please check faiss_lib_search service')
+        ret['rtn'] = -3
         ret['message'] = SEARCH_ERR['fail']
-        ret['query_id'] = -1
-    logger.info('search2 api return: ', ret)
+    logger.info('search3 api return: ', ret)
     return json.dumps(ret)
 

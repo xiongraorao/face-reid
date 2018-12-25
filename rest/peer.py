@@ -202,12 +202,12 @@ def peer():
         else:
             logger.info('query task 已经执行完毕')
             sql = "select x.cluster_id, c.uri, x.times, x.start_time, x.end_time, x.prob, d.src_img, d.peer_img, d.src_time, d.peer_time, d.camera_id " \
-                  "from (select p.query_id, p.id, p.cluster_id, p.times, p.start_time, p.end_time, p.prob from t_peer p where query_id = %s order by p.prob limit %s, %s) x " \
+                  "from (select p.query_id, p.id, p.cluster_id, p.times, p.start_time, p.end_time, p.prob from t_peer p where query_id = %s limit %s, %s) x " \
                   "left join t_peer_detail d on x.id = d.id " \
                   "inner join (" \
                   "select a.cluster_id, a.uri from t_cluster a inner join " \
                   "(select cluster_id, max(`timestamp`) `anchor_time` from t_cluster group by cluster_id) b " \
-                  "on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time group by a.cluster_id) c where c.cluster_id = x.cluster_id"
+                  "on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time group by a.cluster_id) c where c.cluster_id = x.cluster_id order by x.prob desc"
             select_result = db.select(sql, (data['query_id'], data['start_pos'], data['limit']))
             if select_result is None or len(select_result) == 0:
                 logger.info('select from t_peer error or result is null')

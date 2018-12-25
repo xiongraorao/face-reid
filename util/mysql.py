@@ -42,9 +42,9 @@ class Mysql():
             id = self.connection.insert_id()
             cursor.close()
             return id
-        except pymysql.MySQLError:
+        except pymysql.MySQLError as e:
             if hasattr(self, 'logger'):
-                self.logger.error('MySQL error! roll back ...')
+                self.logger.error('MySQL error! %s roll back ...'% str(e))
             self.rollback()
             cursor.close()
             return -1
@@ -82,9 +82,9 @@ class Mysql():
             #self.connection.commit()
             cursor.close()
             return True
-        except pymysql.MySQLError:
+        except pymysql.MySQLError as e:
             if hasattr(self, 'logger'):
-                self.logger.error('MySQL error! roll back ...')
+                self.logger.error('MySQL error! %s roll back ...'% str(e))
             self.rollback()
             cursor.close()
             return False
@@ -105,9 +105,9 @@ class Mysql():
             self.commit()
             cursor.close()
             return data
-        except pymysql.MySQLError:
+        except pymysql.MySQLError as e:
             if hasattr(self, 'logger'):
-                self.logger.error('MySQL error! roll back ...')
+                self.logger.error('MySQL error! %s roll back ...'% str(e))
             self.rollback()
             cursor.close()
             return None
@@ -121,8 +121,8 @@ class Mysql():
                 self.logger.info('SQL execute success! %s has been truncated!' % table_name)
             self.commit()
             cursor.close()
-        except pymysql.MySQLError:
+        except pymysql.MySQLError as e:
             if hasattr(self, 'logger'):
-                self.logger.error('MySQL error! roll back ...')
+                self.logger.error('MySQL error! %s roll back ...'% str(e))
             self.rollback()
             cursor.close()
