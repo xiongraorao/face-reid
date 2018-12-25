@@ -174,7 +174,6 @@ def peer():
         ret['message'] = TRACE_ERR['time_format_err']
         return json.dumps(ret)
     data = update_param(default_params, data)
-    logger.info('parameters:', data)
 
     # 1. 启动查询进程，查询结果放到数据库中
     if data['query_id'] == -1:
@@ -191,12 +190,12 @@ def peer():
         # 2. 第二次查询，直接查表
         tmp = db.select("select count(*) from t_peer where query_id = %s", data['query_id'])
         if data['query_id'] not in proc_pool and (tmp is None or tmp[0][0] == 0):
-            logger.info('query task %s 不存在' % data['query_id'])
-            ret['rtn'] = -1
+            logger.warning('query task %s 不存在' % data['query_id'])
+            ret['rtn'] = -3
             ret['message'] = PEER_ERR['query_not_exist']
         elif data['query_id'] in proc_pool and proc_pool[data['query_id']].is_alive():
-            logger.info('query task 正在进行中')
-            ret['rtn'] = -2
+            logger.warning('query task 正在进行中')
+            ret['rtn'] = -4
             ret['message'] = PEER_ERR['query_in_progress']
             ret['status'] = PEER_ERR['doing']
         else:
@@ -210,8 +209,8 @@ def peer():
                   "on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time group by a.cluster_id) c where c.cluster_id = x.cluster_id order by x.prob desc"
             select_result = db.select(sql, (data['query_id'], data['start_pos'], data['limit']))
             if select_result is None or len(select_result) == 0:
-                logger.info('select from t_peer error or result is null')
-                ret['rtn'] = -1
+                logger.warning('select from t_peer error or result is null')
+                ret['rtn'] = -2
                 ret['query_id'] = data['query_id']
                 ret['message'] = PEER_ERR['fail']
             else:

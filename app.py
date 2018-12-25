@@ -52,6 +52,6 @@ def init():
     logger.info('camera task initialize complete')
 
 if __name__ == '__main__':
-    t = threading.Thread(target=init)
-    t.start()
+    # t = threading.Thread(target=init)
+    # t.start()
     app.run('0.0.0.0')

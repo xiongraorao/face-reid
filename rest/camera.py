@@ -138,7 +138,6 @@ def add():
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
     data = update_param(default_params, data)
-    logger.debug('parameters: ', data)
 
     # 1. 存到数据库
 
@@ -146,7 +145,7 @@ def add():
     camera_id = db.insert(sql, (data['name'], data['url'], data['rate'], data['grab']))
     ret['id'] = camera_id
     if camera_id == -1:
-        logger.info('添加摄像头失败')
+        logger.warning('添加摄像头失败')
         ret['rtn'] = -2
         ret['message'] = CAM_ERR['fail']
     else:
@@ -162,15 +161,14 @@ def add():
                 p.daemon = True
                 p.start()
                 proc_pool[camera_id] = p
+                time.sleep(0.01)
+                db.commit()
+                logger.info('grab process start successfully, url = %s' % data['url'])
             except RuntimeError as e:
                 logger.error('grab process runtime exception:', e)
-                logger.info('mysql rollback')
                 db.rollback()
+                logger.info('add camera operation rollback...')
                 del proc_pool[camera_id]
-            finally:
-                logger.info('抓图进程启动完毕！')
-                logger.info('mysql operation commit')
-                db.commit()
         else:
             db.commit()
             logger.info('只添加摄像头，不抓图')
@@ -218,8 +216,7 @@ def delete():
 
     else:
         logger.info('摄像头删除失败')
-        ret['time_used'] = 0
-        ret['rnt'] = -1
+        ret['rnt'] = -2
         ret['message'] = CAM_ERR['fail']
     logger.debug('process_pool:', proc_pool)
     logger.info('camera delete api return: ', ret)
@@ -249,6 +246,7 @@ def update():
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
     data = update_param(default_params, data)
+
     camera_id = data['id']
     del data['id']
     result = False
@@ -260,7 +258,6 @@ def update():
         ret['time_used'] = round((time.time() - start) * 1000)
         ret['rnt'] = 0
         ret['message'] = CAM_ERR['success']
-        db.commit()
 
         # 关闭原来的抓图
         if camera_id in proc_pool:
@@ -269,25 +266,33 @@ def update():
 
         # 启动抓图进程
         if data['grab'] == 1:
-            p = mp.Process(target=grab_proc, args=(data['url'], data['rate'], camera_id))
-            p.daemon = True
-            p.start()
-            proc_pool[camera_id] = p
-            logger.info('抓图进程启动完毕！')
+            try:
+                p = mp.Process(target=grab_proc, args=(data['url'], data['rate'], camera_id))
+                p.daemon = True
+                p.start()
+                proc_pool[camera_id] = p
+                logger.info('grab process start successfully, url = %s' % data['url'])
+            except RuntimeError as e:
+                logger.error('grab process runtime exception:', e)
+                logger.info('add camera operation rollback...')
+                del proc_pool[camera_id]
+            finally:
+                db.commit()
+
         else:
+            db.commit()
             logger.info('只添加摄像头，不抓图')
     else:
         logger.info('摄像头更新失败')
-        ret['time_used'] = 0
-        ret['rnt'] = -1
+        ret['rnt'] = -2
         ret['message'] = CAM_ERR['fail']
 
-    logger.info('process_pool:', proc_pool)
+    logger.debug('process_pool:', proc_pool)
     logger.info('camera update api return: ', ret)
     return json.dumps(ret)
 
 
-@bp_camera.route('/status', methods=['GET'])
+@bp_camera.route('/status', methods=['POST'])
 def state():
     '''
     查看摄像头状态
@@ -309,11 +314,19 @@ def state():
     camera_id = data['id']
     sql = "select state from `t_camera` where id = %s "
     result = db.select(sql, camera_id)
-    if len(result) == 0 or result is None:
-        logger.warning('状态查询失败，找不到摄像头!')
-        ret['message'] = CAM_ERR['fail']
+    if result is None:
+        logger.warning('SQL select exception')
+        ret['rtn'] = -2
+        ret['message'] = GLOBAL_ERR['sql_select_err']
+    elif len(result) == 0:
+        logger.info('状态查询失败，找不到摄像头!')
+        ret['rtn'] = 0
+        ret['time_used'] = round((time.time() - start) * 1000)
+        ret['message'] = CAM_ERR['null']
     else:
-        logger.warning('状态查询成功')
+        logger.info('状态查询成功')
+        ret['rtn'] = 0
+        ret['time_used'] = round((time.time() - start) * 1000)
         ret['message'] = CAM_ERR['success']
         ret['state'] = result[0][0]
 

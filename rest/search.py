@@ -134,7 +134,6 @@ def search():
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
     data = update_param(default_params, data)
-    logger.info('parameters:', str(data)[:100])
 
     # 1. 启动查询进程，将查询结果放到数据库中
     if data['query_id'] == -1: #第一次查询，启动查询进程
@@ -153,11 +152,11 @@ def search():
         tmp = db.select("select count(*) from t_search where query_id = %s", data['query_id'])
         if data['query_id'] not in proc_pool and (tmp is None or tmp[0][0] == 0) :
             logger.info('query task %s 不存在'% data['query_id'])
-            ret['rtn'] = -2
+            ret['rtn'] = -3
             ret['message'] = SEARCH_ERR['query_not_exist']
         elif data['query_id'] in proc_pool and proc_pool[data['query_id']].is_alive():
             logger.info('query task 正在进行中')
-            ret['rtn'] = -2
+            ret['rtn'] = -4
             ret['message'] = SEARCH_ERR['query_in_progress']
             ret['status'] = SEARCH_ERR['doing']
         else:
@@ -175,7 +174,7 @@ def search():
             select_result = db.select(sql, (data['query_id'], data['start_pos'], data['limit']))
             if select_result is None or len(select_result) == 0:
                 logger.info('mysql db select error, please check')
-                ret['rtn'] = -1
+                ret['rtn'] = -2
                 ret['query_id'] = data['query_id']
                 ret['message'] = SEARCH_ERR['null']
             else:
@@ -233,7 +232,6 @@ def search2():
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
     data = update_param(default_params, data)
-    logger.info('parameters:', data)
 
     # todo 直接查询`t_person` 和 `t_contact`
     repository_ids = data['repository_ids']
@@ -264,8 +262,7 @@ def search2():
     else:
         logger.info('repository is null or mysql db select error')
         ret['message'] = SEARCH_ERR['null']
-        ret['rtn'] = -1
-        ret['query_id'] = -1
+        ret['rtn'] = -2
     logger.info('search2 api return: ', ret)
     return json.dumps(ret)
 
@@ -294,7 +291,6 @@ def search3():
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
     data = update_param(default_params, data)
-    logger.info('parameters:', data)
 
     feature = face_tool.feature(data['image_base64'])
     search_result = lib_searcher.search(1, data['topk'] * 100, [feature])
@@ -327,6 +323,7 @@ def search3():
         if select_result is None or len(select_result) == 0:
             logger.info('select from t_cluster failed or result is null')
             ret['rtn'] = -2
+            ret['message'] = SEARCH_ERR['null']
         else:
             logger.info('select from t_cluster success, cluster size: ', len(select_result))
             results = []
@@ -343,7 +340,7 @@ def search3():
             ret['results'] = results
     else:
         logger.info('search failed! please check faiss_lib_search service')
-        ret['rtn'] = -3
+        ret['rtn'] = -2
         ret['message'] = SEARCH_ERR['fail']
     logger.info('search3 api return: ', ret)
     return json.dumps(ret)

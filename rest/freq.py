@@ -14,7 +14,6 @@ if sup not in sys.path:
 
 from .error import *
 from .param_tool import check_param, update_param, check_date
-from util import time_to_date
 from util import Log
 from util import Mysql
 
@@ -57,24 +56,29 @@ def freq():
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
     # check start end 格式问题
+    # todo 使用正则匹配来解决数据格式问题
     b_date = check_date(data['start'], data['end'])
     if not b_date:
         logger.warning(FREQ_ERR['time_format_err'])
         ret['message'] = FREQ_ERR['time_format_err']
         return json.dumps(ret)
     data = update_param(default_params, data)
-    logger.info('parameters:', data)
 
     if data['camera_ids'] == 'all':
         sql = "select timestamp from `t_cluster` where timestamp between %s and %s " \
               "and cluster_id = %s order by timestamp desc limit %s, %s"
         select_result = db.select(sql,
                                   (data['start'], data['end'], data['cluster_id'], data['start_pos'], data['limit']))
-        if select_result is None or len(select_result) == 0:
-            logger.info('select failed or result is null')
+        if select_result is None:
+            logger.warning('SQL select exception')
+            ret['rtn'] = -2
+            ret['message'] = FREQ_ERR['fail']
+        elif len(select_result) == 0:
+            logger.info('select result is null')
+            ret['rtn'] = 0
+            ret['message'] = FREQ_ERR['null']
         else:
             logger.info('select success')
-
             raw_result = {}
             result = []
             for item in select_result:

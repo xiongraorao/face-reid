@@ -1,6 +1,7 @@
 GLOBAL_ERR = {
     'json_syntax_err': 'JSON syntax error',
-    'param_err': 'parameters is illegal'
+    'param_err': 'parameters is illegal',
+    'sql_select_err': 'SQL select operation error'
 }
 
 CAM_INIT_ERR = {
@@ -17,8 +18,9 @@ CAM_INIT_ERR = {
 }
 
 CAM_ERR = {
-    'success': 'camera operation succeeded',
-    'fail': 'camera operation failed'
+    'success': 'camera operation success',
+    'fail': 'camera operation fail',
+    'null': 'operation result is null'
 }
 
 SEARCH_ERR = {
@@ -52,10 +54,12 @@ TRACE_ERR = {
 
 FREQ_ERR = {
     'time_format_err': 'start or end time format error, eg: 2018-01-01 01:01:01',
-    'success' : 'get frequency success'
+    'success' : 'get frequency successfully',
+    'fail': 'get frequency unsuccessfully'
 }
 
 REPO_ERR = {
     'success': 'repository operation succeeded',
-    'fail': 'repository operation failed'
+    'fail': 'repository operation failed',
+    'null': 'operation result is null'
 }

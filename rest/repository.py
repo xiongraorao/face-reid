@@ -171,7 +171,6 @@ def repo_add():
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
     data = update_param(default_params, data)
-    logger.info('parameters:', data)
 
     sql = "insert into `t_lib` (`name`) values (%s)"
     repo_id = db.insert(sql, (data['name']))
@@ -215,7 +214,6 @@ def repo_del():
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
     data = update_param(default_params, data)
-    logger.info('parameters:', data)
 
     sql = "delete from `t_lib` where `repository_id` = %s"
     result = db.delete(sql, (data['id']))
@@ -227,6 +225,7 @@ def repo_del():
         db.commit()
     else:
         logger.info('人像库删除失败')
+        ret['rtn'] = -2
         ret['message'] = REPO_ERR['fail']
 
     logger.info('repository delete api return: ', ret)
@@ -257,7 +256,6 @@ def repo_update():
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
     data = update_param(default_params, data)
-    logger.info('parameters:', data)
 
     sql = "update `t_lib` set `name` = %s where repository_id = %s"
     result = db.update(sql, (data['name'], data['id']))
@@ -269,6 +267,7 @@ def repo_update():
         db.commit()
     else:
         logger.info('人像库更新失败')
+        ret['rtn'] = -2
         ret['message'] = REPO_ERR['fail']
 
     logger.info('repository update api return: ', ret)
@@ -287,6 +286,7 @@ def repos():
     result = db.select(sql)
     if len(result) == 0 or result is None:
         logger.info('查询人像库失败')
+        ret['rtn'] = -2
         ret['message'] = REPO_ERR['fail']
     else:
         logger.info('查询人像库成功')
@@ -327,7 +327,6 @@ def picture_add():
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
     data = update_param(default_params, data)
-    logger.info('parameters: ', data)
 
     img_list = list(filter(lambda x: x.split('.')[-1] == 'jpg', os.listdir(data['path'])))
     img_list = list(map(lambda x: os.path.join(data['path'], x), img_list))
@@ -352,6 +351,7 @@ def picture_add():
     if insert_result == -1:
         logger.info('insert data into t_person error')
         ret['message'] = REPO_ERR['fail']
+        ret['rtn'] = -2
     else:
         logger.info('insert data into t_person successfully')
         ret['rtn'] = 0
@@ -411,6 +411,7 @@ def picture_add2():
     if insert_result == -1:
         logger.info('insert data into t_person error')
         ret['message'] = REPO_ERR['fail']
+        ret['rtn'] = -2
     else:
         logger.info('insert data into t_person successfully')
         ret['rtn'] = 0

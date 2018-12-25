@@ -61,7 +61,6 @@ def trace():
         ret['message'] = TRACE_ERR['time_format_err']
         return json.dumps(ret)
     data = update_param(default_params, data)
-    logger.info('parameters:', data)
 
     if data['camera_ids'] == 'all':
         sql = "select c.timestamp, c.uri, c.camera_id from `t_cluster` as c where c.cluster_id = %s and  c.timestamp between %s and %s " \
