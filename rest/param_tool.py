@@ -1,5 +1,19 @@
-import time
 import re
+
+CAM_RE = {
+    'url': r'^/.*$|^/.*$ |^rtsp://.*?:.*?@\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,5}.*$',
+    'rate': r'^\d$|^1\d$|^2[0-5]$',
+    'name': r'^.+$',
+    'id': r'^\d+$'
+}
+
+G_RE = {
+    'datetime': r'^([0-9]{3}[1-9]|[0-9]{2}[1-9][0-9]{1}|[0-9]{1}[1-9][0-9]{2}|[1-9][0-9]{3})-(((0[13578]|1[02])-(0[1-9]|[12][0-9]|3[01]))|((0[469]|11)-(0[1-9]|[12][0-9]|30))|(02-(0[1-9]|[1][0-9]|2[0-8])))'
+                r' (0[0-9]:[0-5][0-9]:[0-5][0-9]|1[0-9]:[0-5][0-9]:[0-5][0-9]|2[0-3]:[0-5][0-9]:[0-5][0-9])$',
+    'num': r'^\d+$',
+    'str': r'^.+$'
+}
+
 
 def check_param_key(input_params, necessary_params, optional_params):
     '''
@@ -17,19 +31,20 @@ def check_param_key(input_params, necessary_params, optional_params):
         return True
     return False
 
-def check_param_value(input_values, input_pattern):
+
+def check_param_value(patterns, values):
     '''
     参数合法性校验，检查数据格式
-    :param input_values:
-    :type value list
-    :param input_pattern:
-    :type value list
+    :param patterns
+    :type list[str]
+    :param values
+    :type list[str]
     :return:
     '''
-    if len(input_values) != len(input_pattern):
+    if patterns is None or values is None or len(patterns) != len(values):
         return False
-    for value,pattern in zip(input_values,input_pattern):
-        if not re.match(pattern, value):
+    for p, v in zip(patterns, values):
+        if re.match(p, str(v)) is None:
             return False
     return True
 
@@ -46,20 +61,13 @@ def update_param(default, input):
     ret.update(input)
     return ret
 
-def check_date(*args):
-    for date in args:
-        try:
-            time.strptime(date, "%Y-%m-%d %H:%M:%S")
-        except ValueError as e:
-            print(e)
-            return False
-    return True
-
 if __name__ == '__main__':
-    input_params = {"url":"rtsp://admin:iec123456@192.168.1.72:554/unicast/c1/s0/live", "rate":2, "name":"十字路口"}
+    input_params = {"url": "rtsp://admin:iec123456@192.168.1.72:554/unicast/c1/s0/live", "rate": 2, "name": "十字路口"}
     nessary_params = {'url'}
     default_params = {'rate': 1, 'grab': 1, 'name': 'Default Camera'}
     result = check_param_key(set(input_params), nessary_params, set(default_params))
     print(result)
-    result = check_param_value(list(input_params.values()), [r'rtsp://[.*?]:[.*?]@(^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$):\d+.*'])
 
+    result = check_param_value([CAM_RE['url'], CAM_RE['rate'], CAM_RE['name']],
+                               [input_params['url'], input_params['rate'], input_params['name']])
+    print(result)

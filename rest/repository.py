@@ -98,7 +98,7 @@ def contact(start_id, length):
         # 3. 向动态库检索
         logger.info('start search in index server, topk = %d' % topk)
         search_result = searcher.search(len(features), topk, features)
-        if search_result['rtn'] != 0:
+        if search_result is None or search_result['rtn'] != 0:
             logger.info('search error, seacher service may be down')
         else:
             logger.info('search successfully, used_time = %d ms' % search_result['time_used'])

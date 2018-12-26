@@ -58,7 +58,7 @@ def search_proc(data, query_id):
     if feature is not None:
         logger.info('face feature extracted successfully')
         search_result = searcher.search(1, data['topk'] * 100, [feature]) # 这里默认平均每个cluster大小为100，这样的话，找出来的cluster的个数可能就接近topk
-        if search_result['rtn'] == 0:
+        if search_result is not None and search_result['rtn'] == 0:
             logger.info('search successfully')
             dist_lable = list(map(lambda x, y: (x, y), search_result['results']['distances'][0],
                                   search_result['results']['lables'][0]))
@@ -233,7 +233,6 @@ def search2():
         return json.dumps(ret)
     data = update_param(default_params, data)
 
-    # todo 直接查询`t_person` 和 `t_contact`
     repository_ids = data['repository_ids']
     sql = '''
     select x.*, y.name repo_name from (
@@ -294,7 +293,7 @@ def search3():
 
     feature = face_tool.feature(data['image_base64'])
     search_result = lib_searcher.search(1, data['topk'] * 100, [feature])
-    if search_result['rtn'] == 0:
+    if search_result is not None and search_result['rtn'] == 0:
         logger.info('search successfully')
         dist_lable = list(map(lambda x, y: (x, y), search_result['results']['distances'][0],
                               search_result['results']['lables'][0]))
@@ -340,7 +339,7 @@ def search3():
             ret['results'] = results
     else:
         logger.info('search failed! please check faiss_lib_search service')
-        ret['rtn'] = -2
+        ret['rtn'] = -6
         ret['message'] = SEARCH_ERR['fail']
     logger.info('search3 api return: ', ret)
     return json.dumps(ret)

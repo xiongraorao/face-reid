@@ -14,7 +14,7 @@ if sup not in sys.path:
     sys.path.append(sup)
 
 from .error import *
-from .param_tool import check_param_key, update_param
+from .param_tool import check_param_key, update_param, check_param_value, CAM_RE
 
 from util import Face, mat_to_base64, base64_to_bytes
 from util import Grab
@@ -50,7 +50,6 @@ def grab_proc(url, rate, camera_id):
     '''
     logger = Log('grab-proc'+ str(os.getpid()), 'logs/')
     g = Grab(url, rate, logger=logger)
-    # todo 根据g的 self.initErr 来判断摄像头的各种错误信息，需要操作数据库
     if g.initErr != 0:
         # 写入状态
         sql = 'update `t_camera` set state = %s where id = %s '
@@ -137,6 +136,11 @@ def add():
         logger.warning(GLOBAL_ERR['param_err'])
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
+    legal = check_param_value([CAM_RE['url'], CAM_RE['rate'], CAM_RE['name']], [data['url'], data['rate'], data['name']])
+    if not legal:
+        logger.warning(GLOBAL_ERR['value_err'])
+        ret['message'] = GLOBAL_ERR['value_err']
+        return json.dumps(ret)
     data = update_param(default_params, data)
 
     # 1. 存到数据库
@@ -199,6 +203,11 @@ def delete():
         logger.warning(GLOBAL_ERR['param_err'])
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
+    legal = check_param_value([CAM_RE['id']], [data['id']])
+    if not legal:
+        logger.warning(GLOBAL_ERR['value_err'])
+        ret['message'] = GLOBAL_ERR['value_err']
+        return json.dumps(ret)
     data = update_param(default_params, data)
 
     if data['id'] in proc_pool:
@@ -245,8 +254,12 @@ def update():
         logger.warning(GLOBAL_ERR['param_err'])
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
+    legal = check_param_value([CAM_RE['url'], CAM_RE['rate'], CAM_RE['name'], CAM_RE['id']],[data['url'], data['rate'], data['name'], data['id']])
+    if not legal:
+        logger.warning(GLOBAL_ERR['value_err'])
+        ret['message'] = GLOBAL_ERR['value_err']
+        return json.dumps(ret)
     data = update_param(default_params, data)
-
     camera_id = data['id']
     del data['id']
     result = False
@@ -300,6 +313,8 @@ def state():
     '''
     start = time.time()
     data = request.data.decode('utf-8')
+    nessary_params = {'id'}
+    default_params = {}
     ret = {'time_used': 0, 'rtn': -1}
     try:
         data = json.loads(data)
@@ -307,13 +322,18 @@ def state():
         logger.warning(GLOBAL_ERR['json_syntax_err'])
         ret['message'] = GLOBAL_ERR['json_syntax_err']
         return json.dumps(ret)
-    if 'id' not in data:
+    legal = check_param_key(set(data), nessary_params, set(default_params))
+    if not legal:
         logger.warning(GLOBAL_ERR['param_err'])
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
-    camera_id = data['id']
+    legal = check_param_value([CAM_RE['id']], [data['id']])
+    if not legal:
+        logger.warning(GLOBAL_ERR['value_err'])
+        ret['message'] = GLOBAL_ERR['value_err']
+        return json.dumps(ret)
     sql = "select state from `t_camera` where id = %s "
-    result = db.select(sql, camera_id)
+    result = db.select(sql, data['id'])
     if result is None:
         logger.warning('SQL select exception')
         ret['rtn'] = -2
@@ -322,7 +342,7 @@ def state():
         logger.info('状态查询失败，找不到摄像头!')
         ret['rtn'] = 0
         ret['time_used'] = round((time.time() - start) * 1000)
-        ret['message'] = CAM_ERR['null']
+        ret['message'] = GLOBAL_ERR['null']
     else:
         logger.info('状态查询成功')
         ret['rtn'] = 0

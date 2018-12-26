@@ -121,7 +121,11 @@ class Faiss():
         '''
         url = 'http://' + self.host + ':' + str(self.port) + '/add'
         data_request = {'ntotal': ntotal, 'data': {'ids': ids, 'vectors': vectors}}
-        response = requests.post(url, data=json.dumps(data_request), headers=headers)
+        try:
+            response = requests.post(url, data=json.dumps(data_request), headers=headers)
+        except requests.RequestException as e:
+            print(e)
+            return None
         return response.json()
 
     def search(self, qtotal, topk, queries):
@@ -135,7 +139,11 @@ class Faiss():
         '''
         url = 'http://' + self.host + ':' + str(self.port) + '/search'
         data_request = {'qtotal':qtotal, 'topk': topk, 'queries': queries}
-        response = requests.post(url, data=json.dumps(data_request), headers=headers)
+        try:
+            response = requests.post(url, data=json.dumps(data_request), headers=headers)
+        except requests.RequestException as e:
+            print(e)
+            return None
         return response.json()
 
     def delete(self, ids):
@@ -147,5 +155,9 @@ class Faiss():
         '''
         url = 'http://' + self.host + ':' + str(self.port) + '/del'
         data_request = {'ids': ids}
-        response = requests.post(url, data=json.dumps(data_request), headers=headers)
+        try:
+            response = requests.post(url, data=json.dumps(data_request), headers=headers)
+        except requests.RequestException as e:
+            print(e)
+            return None
         return response.json()

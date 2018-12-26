@@ -13,7 +13,7 @@ if sup not in sys.path:
     sys.path.append(sup)
 
 from .error import *
-from .param_tool import check_param_key, update_param, check_date
+from .param_tool import check_param_key, update_param, G_RE, check_param_value
 from util import Log, trans_sqlin
 from util import Mysql
 
@@ -55,10 +55,12 @@ def trace():
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
     # check start end 格式问题
-    b_date = check_date(data['start'], data['end'])
-    if not b_date:
-        logger.warning(TRACE_ERR['time_format_err'])
-        ret['message'] = TRACE_ERR['time_format_err']
+    p = [G_RE['datetime'], G_RE['datetime'], G_RE['num'], G_RE['num'], G_RE['num']]
+    v = [data['start'], data['end'], data['cluster_id'], data['start_pos'], data['limit']]
+    legal = check_param_value(p, v)
+    if not legal:
+        logger.warning(GLOBAL_ERR['value_err'])
+        ret['message'] = GLOBAL_ERR['value_err']
         return json.dumps(ret)
     data = update_param(default_params, data)
 

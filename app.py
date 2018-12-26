@@ -18,8 +18,6 @@ app.register_blueprint(bp_trace)
 app.register_blueprint(bp_freq)
 app.register_blueprint(bp_repo, url_prefix='/repository')
 
-# todo 初始化的时候，读取数据库中camera的状态，自动启动抓图进程
-
 logger = Log('app', 'logs/')
 config = configparser.ConfigParser()
 config.read('./app.config')
@@ -52,6 +50,6 @@ def init():
     logger.info('camera task initialize complete')
 
 if __name__ == '__main__':
-    # t = threading.Thread(target=init)
-    # t.start()
+    t = threading.Thread(target=init)
+    t.start()
     app.run('0.0.0.0')

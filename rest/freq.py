@@ -13,7 +13,7 @@ if sup not in sys.path:
     sys.path.append(sup)
 
 from .error import *
-from .param_tool import check_param_key, update_param, check_date
+from .param_tool import check_param_key, update_param, check_param_value, G_RE
 from util import Log
 from util import Mysql
 
@@ -56,11 +56,12 @@ def freq():
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
     # check start end 格式问题
-    # todo 使用正则匹配来解决数据格式问题
-    b_date = check_date(data['start'], data['end'])
-    if not b_date:
-        logger.warning(FREQ_ERR['time_format_err'])
-        ret['message'] = FREQ_ERR['time_format_err']
+    p = [G_RE['datetime'], G_RE['datetime'], G_RE['num'], G_RE['num'], G_RE['num'], G_RE['num']]
+    v = [data['start'], data['end'], data['cluster_id'], data['freq'], data['start_pos'], data['limit']]
+    legal = check_param_value(p, v)
+    if not legal:
+        logger.warning(GLOBAL_ERR['value_err'])
+        ret['message'] = GLOBAL_ERR['value_err']
         return json.dumps(ret)
     data = update_param(default_params, data)
 
@@ -76,7 +77,7 @@ def freq():
         elif len(select_result) == 0:
             logger.info('select result is null')
             ret['rtn'] = 0
-            ret['message'] = FREQ_ERR['null']
+            ret['message'] = GLOBAL_ERR['null']
         else:
             logger.info('select success')
             raw_result = {}

@@ -1,6 +1,3 @@
-'''
-程序入口
-'''
 import configparser
 import json
 import time
@@ -63,8 +60,10 @@ def process():
 
         # 1. 进行预分类
         search_result = searcher.search(1, topk, [feature])
-        if search_result['rtn'] == 0:
+        if search_result is not None and search_result['rtn'] == 0:
             logger.info('index search successfully, return result: ', search_result)
+        elif search_result is None:
+            logger.warning('index server is not accessible, please check')
         else:
             logger.info('index search failed, return result: ', search_result)
 
@@ -127,7 +126,7 @@ def process():
         # 添加特征到索引中
         logger.info('add feature to index server')
         add_result = searcher.add(1, [sample_id], [feature])
-        if add_result['rtn'] == 0:
+        if add_result is not None and add_result['rtn'] == 0:
             logger.info('index add successfully, return result:', add_result)
         else:
             logger.info('index add failed, return result:', add_result)
