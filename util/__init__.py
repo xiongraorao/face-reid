@@ -8,3 +8,4 @@ from .mysql import Mysql
 from .search import Faiss
 from .seaweed import WeedClient
 from .tool import date_to_time, time_to_date, trans_sqlin, trans_sqlinsert
+from .cluster import dbscan

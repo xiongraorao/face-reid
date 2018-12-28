@@ -77,6 +77,9 @@ def dbscan(X):
     :return:
     '''
     db = DBSCAN(eps=0.6, min_samples=10, metric='cosine').fit(X)
+    X = np.array(X)
+    S = 1 - np.dot(X, X.T)
+    db = DBSCAN(eps=0.6, min_samples=10, metric='precomputed').fit(S)
 
     labels = db.labels_
     n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
@@ -84,7 +87,7 @@ def dbscan(X):
     print('n_clusters: ', n_clusters)
     print('n_noise: ', n_noise_)
     print('labels: ', labels)
-    write_db(labels)
+    # write_db(labels)
     return labels
 
 
@@ -134,10 +137,10 @@ def birch(X):
 
 if __name__ == '__main__':
     X = load_index('./index-2018-12-26.log')
-    # ap()
-    # meanshift()
-    # dbscan()
-    # birch()
-    # llt()
-    data_transform = pca(X)
-    dbscan(data_transform)
+    # ap(X)
+    # meanshift(X)
+    dbscan(X)
+    # birch(X)
+    # llt(X)
+    # data_transform = pca(X)
+    # dbscan(data_transform)
