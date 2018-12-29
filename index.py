@@ -152,13 +152,16 @@ def process(lock):
             logger.info('process lantency: %d, count = %d' % (lantency,count))
         else:
             logger.info('waiting re-cluster task over')
-            lock.wait(60) # 一分钟检查一次
+            lock.wait(3600) # re-cluster 任务最大执行时长
+            re_cluster = False # 恢复运行
 
-def recluster_schedule(lock, logger):
-    schedule.every().day("00:05").do(job, (lock,logger))
+def recluster_schedule(lock):
+    logger = Log('re_cluster', 'logs/')
+    schedule.every().day.at("00:05").do(job, lock, logger)
     while True:
         schedule.run_pending()
-        time.sleep(1)
+        logger.info('re_cluster_schedule processing...')
+        time.sleep(50) # 50s检查一次，保证不会错过一分钟的时间
 
 def job(lock, logger):
     global re_cluster
@@ -188,7 +191,7 @@ def job(lock, logger):
 
         # 批量update
         ids = list(id_vectors.keys())
-        case = ['when %s then %s '%(ids[i], labels[i]) for i in range(len(ids))]
+        case = ['when {} then {} '.format(ids[i], labels[i]) for i in range(len(ids))]
         case = ''.join(case)
         sql = "update t_cluster set cluster_id = case id {} end where id in {}".format(case, trans_sqlin(ids))
         if db.update(sql):
@@ -206,7 +209,7 @@ def job(lock, logger):
 
 if __name__ == '__main__':
     process_cond = multiprocessing.Condition()
-    cluster_process = multiprocessing.Process(target=recluster_schedule, args=(process_cond,logger))
+    cluster_process = multiprocessing.Process(target=recluster_schedule, args=(process_cond,))
     cluster_process.start()
     logger.info('start re-cluster process')
     process(process_cond)

@@ -22,12 +22,11 @@ def main():
     cond.notify()
     cond.release()
 
-schedule.every().seconds.do(job)
+schedule.every().day.at("10:08").do(job)
 
 
 while True:
-    main()
-    job()
-# while True:
-#     schedule.run_pending()
+    schedule.run_pending()
+    print('pending ...')
+    time.sleep(10)
 
