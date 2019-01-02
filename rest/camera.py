@@ -2,9 +2,11 @@ import configparser
 import json
 import multiprocessing as mp
 import os
+import queue
 import sys
 import time
 
+import cv2
 from flask import Blueprint, request
 
 # get current file dir
@@ -16,7 +18,7 @@ if sup not in sys.path:
 from .error import *
 from .param_tool import check_param_key, update_param, check_param_value, CAM_RE
 
-from util import Face, mat_to_base64, base64_to_bytes
+from util import Face, mat_to_base64, base64_to_bytes, GrabJob
 from util import Grab
 from util import Log
 from util import Kafka
@@ -38,6 +40,8 @@ db.set_logger(logger)
 bp_camera = Blueprint('camera', __name__)
 
 proc_pool = {}
+
+track_internal = 3  # 跟踪间隔， 3秒
 
 def grab_proc(url, rate, camera_id):
     '''
@@ -68,48 +72,87 @@ def grab_proc(url, rate, camera_id):
     logger.info('初始化Kafka')
     kafka = Kafka(bootstrap_servers=config.get('kafka', 'boot_servers'))
     topic = config.get('camera', 'topic')
-    # q = queue.Queue(1000)
-    # job = GrabJob(grab=g, queue=q)
-    # job.start()
-    count = 0
     face_tool = Face(config.get('api','face_server'))
+    detect_count = 0  # 用于detect频次计数
+    frame_internal = track_internal * g.rate
+    trackable = False
+
+    # 启动抓图线程
+    q = queue.Queue()
+    t = GrabJob(grab=g, queue=q)
+    t.start()
+
     while True:
-        img = g.grab_image()
-        if img is not None:
-            # 检测人脸, 启用跟踪模式
-            b64 = mat_to_base64(img)
-            face = face_tool.detect(b64, field='track', camera_id=str(camera_id))
-            for num in range(face['track_nums']):
-                logger.info([camera_id], 'track person success! num = %d' % num)
-                face_b64 = face['track'][num]['image_base64']
+        try:
+            img = q.get(timeout=20)
+            if detect_count % frame_internal == 0:
+                detect_count = 0
+                b64 = mat_to_base64(img)
+                t1 = time.time()
+                detect_result = face_tool.detect(b64)
+                print('detect cost time: ', round((time.time() - t1) * 1000), 'ms')
+                if detect_result['error_message'] != '601':
+                    logger.warning('verifier detector error, error_message:', detect_result['error_message'])
+                    continue
+                tracker = cv2.MultiTracker_create()
+                latest_imgs = []
+                timestamp = round(time.time())
+                for face_num in range(detect_result['detect_nums']):
+                    tmp = detect_result['detect'][face_num]
+                    bbox = (tmp['left'], tmp['top'], tmp['width'], tmp['height'])
+                    tracker.add(cv2.TrackerKCF_create(), img, bbox)
+                    face_b64 = face_tool.crop(bbox[0], bbox[1], bbox[2], bbox[3], b64, True)
+                    latest_img = {'image_base64': face_b64, 'bbox': bbox,
+                                  'landmark': detect_result['detect'][face_num]['landmark'], 'time': timestamp}
+                    latest_imgs.append(latest_img)
+                if detect_result['detect_nums'] > 0:
+                    trackable = True
+                else:
+                    trackable = False
 
-                # mat = base64_to_mat(detect_face)
-                # cv2.imwrite(str(uuid.uuid4())+'.jpg', mat)
-                # logger.info('detect_face: ', detect_face)
+            elif trackable:
+                # 开始追踪
+                ok, bboxs = tracker.update(img)
+                if ok and detect_count < frame_internal - 1:
+                    logger.info('tracking..., detect_count = %d' % detect_count)
+                    detect_count += 1
+                    continue
+                else:
+                    # 取detect到的人脸
+                    logger.info('tracking over!')
+                    for latest in latest_imgs:
+                        logger.info([camera_id], 'track person success!')
+                        face_b64 = latest['image_base64']
 
-                # save img to seaweed fs
-                logger.info([camera_id], 'save grabbed face to seaweed fs')
-                assign = master.assign()
-                logger.info([camera_id], 'assign result:', assign)
-                # bs = cv2.imencode('.jpg', detect_face)
+                        # save img to seaweed fs
+                        logger.info([camera_id], 'save grabbed detect_result to seaweed fs')
+                        assign = master.assign()
+                        logger.info([camera_id], 'assign result:', assign)
 
-                ret = master.upload(assign['url'], assign['fid'], base64_to_bytes(face_b64), assign['fid'] + '.jpg')
-                logger.info([camera_id], 'upload result:', ret)
+                        ret = master.upload(assign['url'], assign['fid'], base64_to_bytes(face_b64),
+                                            assign['fid'] + '.jpg')
+                        logger.info([camera_id], 'upload result:', ret)
 
-                # send to Kafka
-                url = 'http' + ':' + '//' + assign['url'] + '/' + assign['fid']
-                logger.info('[', camera_id, ']', 'img url:', url)
-                msg = json.dumps({'url': url, 'time': int(face['track'][num]['bestTime']), 'camera_id': camera_id,
-                                  'landmark': face['track'][num]['landmark']})
-                logger.info([camera_id], 'send to kafka: ', msg)
-                kafka.send(topic, msg)
-                count = 0
-        else:
-            count += 1
-            if count > 50:  # 连续50帧抓不到图，则释放资源
-                logger.warning('连续50帧抓图异常，退出抓图进程!')
-                g.close()
-                break
+                        # send to Kafka
+                        url = 'http' + ':' + '//' + assign['url'] + '/' + assign['fid']
+                        logger.info('[', camera_id, ']', 'img url:', url)
+                        msg = json.dumps({'url': url, 'time': latest['time'], 'camera_id': camera_id,
+                                          'landmark': latest['landmark']})
+                        logger.info([camera_id], 'send to kafka: ', msg)
+                        kafka.send(topic, msg)
+                    # 再次进入detect
+                    detect_count = 0
+                    trackable = False
+                    logger.info('restart detection')
+            else:
+                logger.info('detect 0 detect_result, do not track', 'detect count= ', detect_count)
+                detect_count += 1
+                continue
+        except queue.Empty as e:
+            logger.error(e)
+            logger.error('grab queue empty error, exit')
+            break
+        detect_count += 1
     logger.info('抓图进程终止')
 
 

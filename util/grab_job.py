@@ -1,10 +1,21 @@
+import os
+import queue
+import sys
 import threading
 import time
 
+# get current file dir
+sup = os.path.dirname(os.path.realpath(__file__))
+sup = os.path.dirname(sup)
+if sup not in sys.path:
+    sys.path.append(sup)
+
+from util import Grab
+
 
 class GrabJob(threading.Thread):
-    def __init__(self, *args, **kwargs):
-        super(GrabJob, self).__init__(*args, **kwargs)
+    def __init__(self, **kwargs):
+        super(GrabJob, self).__init__()
         self.__flag = threading.Event()  # 用于暂停线程的标识
         self.__flag.set()  # 设置为True
         self.__running = threading.Event()  # 用于停止线程的标识
@@ -39,13 +50,15 @@ class GrabJob(threading.Thread):
 
 
 if __name__ == '__main__':
-    job = GrabJob()
+    g = Grab('rtsp://admin:iec123456@192.168.1.71:554/unicast/c1/s0/live', 10)
+    q = queue.Queue()
+    job = GrabJob(grab=g, queue=q)
     print('线程启动')
     job.start()
-    time.sleep(10)
+    time.sleep(1)
     print('线程暂停5s')
     job.pause()
-    time.sleep(5)
+    time.sleep(10) # 当抓取线程停顿时间较长，会报出data null的错误，ffmpeg本身没有buff，抓图不能太慢了
     print('线程恢复')
     job.resume()
     time.sleep(10)
