@@ -22,18 +22,25 @@ class GrabJob(threading.Thread):
         self.__running.set()  # 设置为True
         self.grab = kwargs['grab']  # grab Object
         self.queue = kwargs['queue']  # output queue
+        self.logger = kwargs['logger']
 
     def run(self):
+        count = 0
         try:
             while self.__running.isSet():
                 self.__flag.wait()  # 为True时返回，为False阻塞
-                # print('this is run')
-                # time.sleep(1)
                 img = self.grab.grab_image()
                 if img is not None:
                     self.queue.put(img)
+                    count = 0
+                else:
+                    count += 1
+                    if count > 50:  # 连续50帧抓不到图，则释放资源
+                        self.logger.warning('连续50帧抓图异常，退出抓图进程!')
+                        g.close()
+                        raise RuntimeError('grab exception, exit')
         except Exception as e:
-            print(e)
+            self.logger.error(e)
             self.grab.close()
         finally:
             self.grab.close()
