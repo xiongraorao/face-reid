@@ -79,7 +79,7 @@ def dbscan(X):
     db = DBSCAN(eps=0.6, min_samples=10, metric='cosine').fit(X)
     X = np.array(X)
     S = 1 - np.dot(X, X.T)
-    db = DBSCAN(eps=0.6, min_samples=10, metric='precomputed').fit(S)
+    db = DBSCAN(eps=0.6, min_samples=1, metric='precomputed').fit(S)
 
     labels = db.labels_
     n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
@@ -87,7 +87,9 @@ def dbscan(X):
     print('n_clusters: ', n_clusters)
     print('n_noise: ', n_noise_)
     print('labels: ', labels)
-    # write_db(labels)
+    write_db(labels)
+    print('db core sample index', len(db.core_sample_indices_))
+    print('db algorithm', db.algorithm)
     return labels
 
 

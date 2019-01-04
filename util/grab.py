@@ -31,6 +31,7 @@ class Grab():
         self.rate = rate
         lib_path = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), 'linux-build-cmake-make',
                                 'ffmpeg-python.so')
+        print('lib_path: ', lib_path)
         self.ffmpegPython = cdll.LoadLibrary(lib_path)
         # char *input_filename, bool nobuffer, bool use_gpu, int timeout, [out] width, [out] height
         self.ffmpegPython.init.argtypes = [c_char_p, c_bool, c_bool, c_int, POINTER(c_int), POINTER(c_int)]

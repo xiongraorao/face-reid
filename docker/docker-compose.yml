@@ -3,6 +3,8 @@ version: '3.1'
 services:
   zoo1:
     image: harbor.oceanai.com.cn/finder_dev/zookeeper
+    networks:
+      - face-reid
     container_name: zoo1
     restart: always
     hostname: zoo1
@@ -17,6 +19,8 @@ services:
 
   zoo2:
     image: harbor.oceanai.com.cn/finder_dev/zookeeper
+    networks:
+      - face-reid
     container_name: zoo2
     restart: always
     hostname: zoo2
@@ -28,9 +32,11 @@ services:
     volumes:
     - /data/docker/zk2_data:/data
     - /data/docker/zk2_log:/datalog
-    
+
   zoo3:
     image: harbor.oceanai.com.cn/finder_dev/zookeeper
+    networks:
+      - face-reid
     restart: always
     container_name: zoo3
     hostname: zoo3
@@ -42,9 +48,11 @@ services:
     volumes:
     - /data/docker/zk3_data:/data
     - /data/docker/zk3_log:/datalog
-    
+
   kafka1:
     image: harbor.oceanai.com.cn/finder_dev/kafka
+    networks:
+      - face-reid
     hostname: kafka1
     restart: always
     ports:
@@ -63,6 +71,8 @@ services:
 
   kafka2:
     image: harbor.oceanai.com.cn/finder_dev/kafka
+    networks:
+      - face-reid
     hostname: kafka2
     restart: always
     ports:
@@ -81,6 +91,8 @@ services:
 
   kafka3:
     image: harbor.oceanai.com.cn/finder_dev/kafka
+    networks:
+      - face-reid
     hostname: kafka3
     restart: always
     ports:
@@ -99,7 +111,10 @@ services:
 
   db:
     image: harbor.oceanai.com.cn/finder_dev/mysql
+    networks:
+      - face-reid
     restart: always
+    hostname: mysql
     container_name: mysql
     command: "mysqld --max-connections=5000 --default-time-zone='+8:00'"
     ports:
@@ -108,9 +123,12 @@ services:
     - /data/docker/mysql:/var/lib/mysql
     environment:
       MYSQL_ROOT_PASSWORD: oceanai
+      MYSQL_DATABASE: face_reid
 
   weed-master:
     image: harbor.oceanai.com.cn/finder_dev/seaweedfs
+    networks:
+      - face-reid
     hostname: master
     restart: always
     volumes:
@@ -121,6 +139,8 @@ services:
 
   weed-volume:
     image: harbor.oceanai.com.cn/finder_dev/seaweedfs
+    networks:
+      - face-reid
     restart: always
     ports:
     - 38080:38080
@@ -129,3 +149,91 @@ services:
     - /data/docker/weed-slave:/data
     depends_on:
     - weed-master
+
+  faiss-cluster:
+    image: harbor.oceanai.com.cn/library/faiss-py
+    networks:
+      - face-reid
+    hostname: faiss-cluster
+    restart: always
+    volumes:
+      - /data/docker/faiss-cluster:/home/app/faiss-py/logs
+    ports:
+      - 2344:2344
+
+  faiss-lib:
+    image: harbor.oceanai.com.cn/library/faiss-py
+    networks:
+      - face-reid
+    hostname: faiss-lib
+    restart: always
+    volumes:
+      - /data/docker/faiss-lib:/home/app/faiss-py/logs
+    ports:
+      - 2345:2344
+
+  verifier:
+    image: harbor.oceanai.com.cn/detector/verifier-zmq-dealer-190107-57ee7c71:gpu
+    container_name: verifier-zmq-dealer-yml
+    restart: always
+    networks:
+      - face-reid
+    ports:
+      - "5050:5050"
+    environment:
+      DETECT_THREADS: 20
+      ZMQ_ADDR: verifier-zmq-router-yml
+      MAX_REQUESTS: 1000
+      GPU_DEVICES: 1
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /data/docker/verifier-zmq-dealer/FaissFile:/opt/verifier/FaissFile
+      - /data/docker/verifier-zmq-dealer/logs:/opt/verifier/logs
+
+  router:
+    image: harbor.oceanai.com.cn/detector/verifier-zmq-router-180531:gpu
+    container_name: verifier-zmq-router-yml
+    restart: always
+    ports:
+      - "5559:5559"
+      - "5560"
+    networks:
+      - face-reid
+
+  face-app:
+    image: harbor.oceanai.com.cn/library/face-reid:test
+    networks:
+      - face-reid
+    container_name: face-app
+    restart: always
+    volumes:
+      - /data/docker/face-app:/home/app/face-reid/logs
+    ports:
+      - 5000:5000
+    environment:
+      CMD: app.py
+    depends_on:
+      - db
+      - kafka1
+      - kafka2
+      - kafka3
+
+  face-index:
+    image: harbor.oceanai.com.cn/library/face-reid:test
+    networks:
+      - face-reid
+    container_name: face-index
+    restart: always
+    volumes:
+      - /data/docker/face-index:/home/app/face-reid/logs
+    environment:
+      CMD: index.py
+    depends_on:
+      - db
+      - kafka1
+      - kafka2
+      - kafka3
+
+networks:
+    face-reid:

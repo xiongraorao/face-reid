@@ -37,7 +37,7 @@ class GrabJob(threading.Thread):
                     count += 1
                     if count > 50:  # 连续50帧抓不到图，则释放资源
                         self.logger.warning('连续50帧抓图异常，退出抓图进程!')
-                        g.close()
+                        self.grab.close()
                         raise RuntimeError('grab exception, exit')
         except Exception as e:
             self.logger.error(e)
