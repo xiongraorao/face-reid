@@ -3,6 +3,7 @@ import json
 import threading
 import time
 
+import pymysql
 import requests
 from flask import Flask
 
@@ -23,6 +24,22 @@ logger = Log('app', 'logs/')
 config = configparser.ConfigParser()
 config.read('./app.config')
 
+# 设置数据库mode
+conn = pymysql.connect(
+    host=config.get('db', 'host'),
+    port=config.getint('db', 'port'),
+    user=config.get('db', 'user'),
+    password=config.get('db', 'password'),
+    connect_timeout=60
+)
+cur = conn.cursor()
+cur.execute("alter database {} character set utf8;".format(config.get('db', 'db')))
+cur.execute(
+    "SET GLOBAL sql_mode = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION';")
+cur.close()
+conn.commit()
+conn.close()
+
 db = Mysql(host=config.get('db', 'host'),
            port=config.getint('db', 'port'),
            user=config.get('db', 'user'),
@@ -33,9 +50,6 @@ db.set_logger(logger)
 
 tables = [
     """
-    SET GLOBAL sql_mode = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION';
-    """,
-    """
     CREATE TABLE IF NOT EXISTS `t_camera`(
   `id` INT PRIMARY KEY AUTO_INCREMENT COMMENT '摄像头ID',
   `name` VARCHAR(100) DEFAULT 'Default Camera' COMMENT '摄像头名称',
@@ -45,7 +59,7 @@ tables = [
   `state` INT DEFAULT 1 COMMENT '摄像头状态',
   `create_time` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `update_time` TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP
-);
+)default charset = utf8;
     """,
     """
     CREATE TABLE IF NOT EXISTS `t_cluster`(
@@ -54,7 +68,7 @@ tables = [
   `uri` VARCHAR(100) NOT NULL COMMENT '抓拍人员的URI',
   `timestamp` TIMESTAMP NOT NULL COMMENT '抓拍时间',
   `camera_id` INT NOT NULL COMMENT '抓拍摄像头的ID'
-);
+)default charset = utf8;
     """,
     """
     CREATE INDEX cluster ON `t_cluster`(cluster_id);
@@ -63,7 +77,7 @@ tables = [
     CREATE TABLE IF NOT EXISTS `t_lib`(
   `repository_id` INT PRIMARY KEY AUTO_INCREMENT COMMENT '人像库ID',
   `name` VARCHAR(100) NOT NULL COMMENT '人像库名称'
-);
+)default charset = utf8;
     """,
     """
     CREATE TABLE IF NOT EXISTS `t_person`(
@@ -73,7 +87,7 @@ tables = [
   `repository_id` INT NOT NULL COMMENT '人像库ID',
   FOREIGN KEY (`repository_id`) REFERENCES `t_lib`(`repository_id`)
     ON UPDATE CASCADE ON DELETE CASCADE
-);
+)default charset = utf8;
     """,
     """
     CREATE TABLE IF NOT EXISTS `t_contact`(
@@ -81,7 +95,7 @@ tables = [
   `cluster_id` VARCHAR(100) NOT NULL COMMENT '动态库的类ID',
   `similarity` FLOAT COMMENT '该person和cluster_id的相似度',
   FOREIGN KEY (id) REFERENCES `t_person`(`id`) ON UPDATE CASCADE ON DELETE CASCADE
-);
+)default charset = utf8;
     """,
     """
     CREATE TABLE IF NOT EXISTS `t_search`(
@@ -89,7 +103,7 @@ tables = [
   `cluster_id` VARCHAR(100) COMMENT '待查对象所属的类ID',
   `similarity` FLOAT COMMENT '相似度',
   `query_id` INT COMMENT 'query_id, 用于找到结果'
-);
+)default charset = utf8;
     """,
     """
     CREATE TABLE IF NOT EXISTS `t_peer`(
@@ -101,7 +115,7 @@ tables = [
   `start_time` TIMESTAMP COMMENT '开始同行时间',
   `end_time` TIMESTAMP COMMENT '结束同行时间',
   `prob` VARCHAR(10) COMMENT '两个人同行的概率'
-);
+)default charset = utf8;
     """,
     """
     CREATE TABLE IF NOT EXISTS `t_peer_detail`(
@@ -111,7 +125,7 @@ tables = [
   `src_time` TIMESTAMP COMMENT '同行的某时刻的目标抓拍时间',
   `peer_time` TIMESTAMP COMMENT '同行的某时刻的同行人抓拍时间',
   `camera_id` INT COMMENT '在具体的哪一个摄像机下同行'
-);
+)default charset = utf8;
     """
 ]
 
