@@ -60,6 +60,7 @@ def process(lock):
     face_tool = Face(config.get('api', 'face_server'))
     searcher = Faiss(config.get('api', 'faiss_host'), config.getint('api', 'faiss_port'))
     count = 0
+    global re_cluster
     for msg in consumer:
         if not re_cluster:
             logger.info('get msg: ', msg)
