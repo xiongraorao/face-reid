@@ -79,7 +79,7 @@ def grab_proc(url, rate, camera_id):
     trackable = False
 
     # 启动抓图线程
-    q = queue.Queue()
+    q = queue.Queue(maxsize=100)
     t = GrabJob(grab=g, queue=q, logger=logger)
     t.start()
 
