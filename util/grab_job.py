@@ -11,10 +11,12 @@ if sup not in sys.path:
     sys.path.append(sup)
 
 from util import Grab
+from .mysql import Mysql
+from .error import *
 
 
 class GrabJob(threading.Thread):
-    def __init__(self, img_queue, url, rate, logger, max_retry=5):
+    def __init__(self, img_queue, camera_id, url, rate, logger, config, max_retry=5):
         '''
         initialize ffmepg image grab Job
         :param img_queue:
@@ -29,17 +31,39 @@ class GrabJob(threading.Thread):
         self.__running = threading.Event()  # 用于停止线程的标识
         self.__running.set()  # 设置为True
         self.queue = img_queue
+        self.camera_id = camera_id
         self.url = url
         self.rate = rate
         self.logger = logger
         self.max_retry = max_retry
+        self.db = Mysql(host=config.get('db', 'host'),
+                        port=config.getint('db', 'port'),
+                        user=config.get('db', 'user'),
+                        password=config.get('db', 'password'),
+                        db=config.get('db', 'db'),
+                        charset=config.get('db', 'charset'))
+        self.db.set_logger(logger)
 
     def __create(self):
         '''
         创建grab
         :return:
         '''
-        return Grab(self.url, self.rate, logger=self.logger)
+        g = Grab(self.url, self.rate, logger=self.logger)
+        if g.initErr != 0:
+            # 写入状态
+            sql = 'update `t_camera` set state = %s where id = %s '
+            ret = self.db.update(sql, (g.initErr, self.camera_id))
+            if ret:
+                self.logger.info([self.camera_id], '更新摄像头state成功')
+            else:
+                self.logger.info([self.camera_id], '更新摄像头state失败')
+            self.logger.info([self.camera_id], '摄像头视频流初始化失败, %s ' % CAM_INIT_ERR[g.initErr])
+            g.close()  # 关闭抓图进程
+            return None
+        else:
+            self.logger.info([self.camera_id], '摄像头视频流初始化正常')
+        return g
 
     def run(self):
         count = 0
@@ -47,38 +71,44 @@ class GrabJob(threading.Thread):
         grabber = self.__create()
         while self.__running.isSet():
             self.__flag.wait()  # 为True时返回，为False阻塞
-            img = grabber.grab_image()
-            if img is not None:
-                self.queue.put(img)
-                count = 0
-                retried = 0
-            else:
-                count += 1
-                if count > 50:  # 连续50帧抓不到图，则释放资源
-                    self.logger.warning('连续50帧抓图异常，退出抓图进程!')
-                    grabber.close()
-                    self.logger.warning('grab thread retry... count = %d' % retried)
-                    retried += 1
-                    if retried > self.max_retry:
-                        self.logger.error('grab thread has retried %d times, exit' % self.max_retry)
-                    else:
-                        self.logger.warning('restart grab thread...(%d)' % retried)
+            if grabber is not None:
+                img = grabber.grab_image()
+                if img is not None:
+                    self.queue.put(img)
+                    count = 0
+                    retried = 0
+                else:
+                    count += 1
+                    if count > 50:  # 连续50帧抓不到图，则释放资源
+                        self.logger.warning([self.camera_id], '连续50帧抓图异常，退出抓图进程!')
                         grabber.close()
-                        grabber = self.__create()
-                self.logger.info('grab data is null')
+                        retried += 1
+                        self.logger.warning([self.camera_id], 'grab thread retry... count = %d' % retried)
+                        if retried > self.max_retry:
+                            self.logger.error([self.camera_id], 'grab thread has retried %d times, exit' % retried)
+                        else:
+                            self.logger.warning([self.camera_id], 'restart grab thread...(%d)' % retried)
+                            grabber.close()
+                            grabber = self.__create()
+                    self.logger.info([self.camera_id], 'grab image is null, count = %d' % count)
+            else:
+                self.logger.info([self.camera_id], 'grabber is None, recreate grabber ... (%d)' % retried)
+                retried += 1
+                if retried > self.max_retry:
+                    self.logger.info([self.camera_id],
+                                     'grabber is None, recreating grabber has retried %d times, exit' % retried)
+                    break
+        self.logger.info([self.camera_id], 'grab thread is over')
 
+    def pause(self):
+        self.__flag.clear()
 
-def pause(self):
-    self.__flag.clear()
+    def resume(self):
+        self.__flag.set()
 
-
-def resume(self):
-    self.__flag.set()
-
-
-def stop(self):
-    self.__flag.set()
-    self.__running.clear()
+    def stop(self):
+        self.__flag.set()
+        self.__running.clear()
 
 
 if __name__ == '__main__':
