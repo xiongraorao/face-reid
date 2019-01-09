@@ -1,7 +1,7 @@
 import cv2
 import time
 
-capture = cv2.VideoCapture("rtsp://admin:iec123456@192.168.1.71:554/unicast/c1/s0/live")
+capture = cv2.VideoCapture("rtsp://100.98.0.240:8000/42012403001226797014_1")
 
 while True:
     start = time.time()
