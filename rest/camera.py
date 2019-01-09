@@ -19,7 +19,6 @@ from .error import *
 from .param_tool import check_param_key, update_param, check_param_value, CAM_RE
 
 from util import Face, mat_to_base64, base64_to_bytes, GrabJob
-from util import Grab
 from util import Log
 from util import Kafka
 from util import Mysql
@@ -54,20 +53,6 @@ def grab_proc(url, rate, camera_id):
     :return:
     '''
     logger = Log('grab-proc' + str(os.getpid()), 'logs/')
-    g = Grab(url, rate, logger=logger)
-    if g.initErr != 0:
-        # 写入状态
-        sql = 'update `t_camera` set state = %s where id = %s '
-        ret = db.update(sql, (g.initErr, camera_id))
-        if ret:
-            logger.info([camera_id], '更新摄像头state成功')
-        else:
-            logger.info([camera_id], '更新摄像头state失败')
-        logger.info([camera_id], '摄像头视频流初始化失败, %s ' % CAM_INIT_ERR[g.initErr])
-        g.close()  # 关闭抓图进程
-        return
-    else:
-        logger.info([camera_id], '摄像头视频流初始化正常')
     logger.info('初始化seaweedfs')
     master = WeedClient(config.get('weed', 'host'), config.getint('weed', 'port'))
     logger.info('初始化Kafka')
@@ -75,12 +60,12 @@ def grab_proc(url, rate, camera_id):
     topic = config.get('camera', 'topic')
     face_tool = Face(config.get('api', 'face_server'))
     detect_count = 0  # 用于detect频次计数
-    frame_internal = track_internal * g.rate
+    frame_internal = track_internal * rate
     trackable = False
 
     # 启动抓图线程
     q = queue.Queue(maxsize=100)
-    t = GrabJob(q, url, rate, Log('grab-proc' + str(os.getpid()) + '-thread', 'logs/'))
+    t = GrabJob(q, camera_id, url, rate, Log('grab-proc' + str(os.getpid()) + '-thread', 'logs/'), config)
     t.start()
 
     while True:
@@ -224,7 +209,7 @@ def add():
         else:
             db.commit()
             logger.info('只添加摄像头，不抓图')
-    logger.debug('process_pool: ', proc_pool)
+    logger.info('process_pool: ', proc_pool)
     logger.info('camera add api return: ', ret)
     return json.dumps(ret)
 
@@ -275,7 +260,7 @@ def delete():
         logger.info('摄像头删除失败')
         ret['rnt'] = -2
         ret['message'] = CAM_ERR['fail']
-    logger.debug('process_pool:', proc_pool)
+    logger.info('process_pool:', proc_pool)
     logger.info('camera delete api return: ', ret)
     return json.dumps(ret)
 
@@ -349,7 +334,7 @@ def update():
         ret['rnt'] = -2
         ret['message'] = CAM_ERR['fail']
 
-    logger.debug('process_pool:', proc_pool)
+    logger.info('process_pool:', proc_pool)
     logger.info('camera update api return: ', ret)
     return json.dumps(ret)
 
@@ -399,5 +384,6 @@ def state():
         ret['message'] = CAM_ERR['success']
         ret['state'] = result[0][0]
 
+    logger.info('process_pool:', proc_pool)
     logger.info('camera state api return: ', ret)
     return json.dumps(ret)
