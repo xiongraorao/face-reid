@@ -26,24 +26,49 @@ data = [
     {'url': 'rtsp://100.98.0.240:8000/42012439001229636809_1', 'name': '珞瑜东路武缝小区交界处', 'rate': 10}
 ]
 
+data2 = [
+    {'url': 'rtsp://admin:iec123456@192.168.1.71:554/unicast/c1/s0/live', 'name': '开发室', 'rate': 10},
+    {'url': 'rtsp://admin:iec123456@192.168.1.72:554/unicast/c1/s0/live', 'name': '十字路口', 'rate': 10},
+    {'url': 'rtsp://admin:123456@192.168.1.62:554/h264/ch1/main/av_stream', 'name': '一楼大厅', 'rate': 10},
+    {'url': 'rtsp://admin:123456@192.168.1.63:554/h264/ch1/main/av_stream', 'name': '7楼电梯口1', 'rate': 10},
+    {'url': 'rtsp://admin:123456@192.168.1.64:554/h264/ch1/main/av_stream', 'name': '7楼电梯口2', 'rate': 10},
+    {'url': 'rtsp://admin:123456@192.168.1.65:554/h264/ch1/main/av_stream', 'name': '公司门口', 'rate': 10},
+    {'url': 'rtsp://admin:123456@192.168.1.66:554/h264/ch1/main/av_stream', 'name': '产品部演示系统', 'rate': 10},
+    {'url': 'rtsp://admin:123456@192.168.1.67:554/h264/ch1/main/av_stream', 'name': '公司大厅', 'rate': 10},
+    {'url': 'rtsp://admin:123456@192.168.1.68:554/h264/ch1/main/av_stream', 'name': '过道', 'rate': 10},
+    {'url': 'rtsp://admin:123456@192.168.1.69:554/h264/ch1/main/av_stream', 'name': '会议室演示系统', 'rate': 10},
+    {'url': 'rtsp://admin:123456@192.168.1.70:554/h264/ch1/main/av_stream', 'name': '会议室', 'rate': 10}
+]
+
 headers = {'content-type': "application/json"}
 
 
 def post(url):
-    for d in data:
+    for d in data2:
         response = requests.post(url, data=json.dumps(d), headers=headers)
         print(response.json())
-        time.sleep(5)
+        # time.sleep(5)
 
 
-post('http://100.98.10.55:5000/camera/add')
+# post('http://100.98.10.55:5000/camera/add')
+# post('http://192.168.1.6:5000/camera/add')
 
 def cam_del(ids):
-    url = 'http://100.98.10.55:5000/camera/del'
+    # url = 'http://100.98.10.55:5000/camera/del'
+    url = 'http://192.168.1.6:5000/camera/del'
     for id in ids:
         response = requests.post(url, data=json.dumps({'id': id}), headers=headers)
         print(response.json())
 
 # cam_del([1,2,3,4,5])
 
+def status(id):
+    url = 'http://192.168.1.6:5000/camera/status'
+    response = requests.post(url, data=json.dumps({'id': id}), headers=headers)
+    print(response.json())
+
+status(1)
+
+# cam_del(list(range(1,22)))
+cam_del([22])
 

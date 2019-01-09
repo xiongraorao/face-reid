@@ -246,19 +246,20 @@ def delete():
     if data['id'] in proc_pool:
         logger.info('停止抓图!')
         proc_pool[data['id']].terminate()  # 停止抓图进程
+        del proc_pool[data['id']] # 删除对应的进程
 
     sql = "delete from `t_camera` where id = %s "
     result = db.delete(sql, (data['id']))
     if result:
         logger.info('摄像头删除成功')
         ret['time_used'] = round((time.time() - start) * 1000)
-        ret['rnt'] = 0
+        ret['rtn'] = 0
         ret['message'] = CAM_ERR['success']
         db.commit()
 
     else:
         logger.info('摄像头删除失败')
-        ret['rnt'] = -2
+        ret['rtn'] = -2
         ret['message'] = CAM_ERR['fail']
     logger.info('process_pool:', proc_pool)
     logger.info('camera delete api return: ', ret)
@@ -303,13 +304,14 @@ def update():
     if result:
         logger.info('摄像头更新成功')
         ret['time_used'] = round((time.time() - start) * 1000)
-        ret['rnt'] = 0
+        ret['rtn'] = 0
         ret['message'] = CAM_ERR['success']
 
         # 关闭原来的抓图
         if camera_id in proc_pool:
             logger.info('停止抓图!')
             proc_pool[camera_id].terminate()  # 停止抓图进程
+            del proc_pool[camera_id]  # 删除对应的进程
 
         # 启动抓图进程
         if data['grab'] == 1:
@@ -331,7 +333,7 @@ def update():
             logger.info('只添加摄像头，不抓图')
     else:
         logger.info('摄像头更新失败')
-        ret['rnt'] = -2
+        ret['rtn'] = -2
         ret['message'] = CAM_ERR['fail']
 
     logger.info('process_pool:', proc_pool)
