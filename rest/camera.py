@@ -106,7 +106,7 @@ def grab_proc(url, rate, camera_id):
                     latest_img = {'image_base64': face_b64, 'bbox': bbox,
                                   'landmark': detect_result['detect'][face_num]['landmark'], 'time': timestamp}
                     # 增加人脸质量过滤
-                    if tmp['sideFace'] == 1 and tmp['quality'] == 1 and tmp['score'] > 0.95:
+                    if tmp['sideFace'] == 0 and tmp['quality'] == 1 and tmp['score'] > 0.95:
                         latest_imgs.append(latest_img)
                 if len(latest_imgs) > 0:
                     trackable = True
