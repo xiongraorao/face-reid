@@ -80,7 +80,7 @@ def grab_proc(url, rate, camera_id):
 
     # 启动抓图线程
     q = queue.Queue(maxsize=100)
-    t = GrabJob(grab=g, queue=q, logger=logger)
+    t = GrabJob(q, url, rate, Log('grab-proc' + str(os.getpid()) + '-thread', 'logs/'))
     t.start()
 
     while True:
