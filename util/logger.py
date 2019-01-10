@@ -16,6 +16,8 @@ class Log:
         logging.basicConfig(format=LOG_FORMAT, datefmt=DATE_FORMAT, level=level)
         self.logger = logging.getLogger(name)  # 程序名
         if is_save:
+            if not os.path.exists(path):
+                os.makedirs(path)
             file_handler = logging.FileHandler(filename=os.path.join(path, name + '.log'), encoding='utf-8')
             file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
             self.logger.addHandler(file_handler)
