@@ -94,7 +94,7 @@ class Grab():
             img = np.frombuffer(tmp_buf.contents, dtype=np.uint8)
             img = img.reshape(self.height, self.width , 3)
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-            self.logger.info('grab success, size = %d' % size.value)
+            # self.logger.info('grab success, size = %d' % size.value)
             self.__release(tmp_buf)
             return img
         else:
