@@ -1,5 +1,6 @@
 import pymysql
 
+
 class Mysql():
     def __init__(self, host, port, user, password, db, charset='utf8'):
         '''
@@ -24,7 +25,10 @@ class Mysql():
 
     def __create_connection(self):
         self.connection = pymysql.connect(host=self.host, port=self.port, user=self.user,
-                               password=self.password, db=self.db, charset=self.charset)
+                                          password=self.password, db=self.db, charset=self.charset)
+
+    def __reconnect(self):
+        self.connection.ping(True)
 
     def insert(self, sql, args=None):
         '''
@@ -33,18 +37,19 @@ class Mysql():
         :param args:
         :return:
         '''
+        self.__reconnect()
         cursor = self.connection.cursor()
         try:
             ret = cursor.execute(sql, args)
             if hasattr(self, 'logger'):
                 self.logger.info('SQL execute success! %d row has been changed!' % ret)
-            #self.connection.commit()
+            # self.connection.commit()
             id = self.connection.insert_id()
             cursor.close()
             return id
         except pymysql.MySQLError as e:
             if hasattr(self, 'logger'):
-                self.logger.error('MySQL error! %s roll back ...'% str(e))
+                self.logger.error('MySQL error! %s roll back ...' % str(e))
             self.rollback()
             cursor.close()
             return -1
@@ -74,17 +79,18 @@ class Mysql():
         :param args:
         :return: no
         '''
+        self.__reconnect()
         cursor = self.connection.cursor()
         try:
             ret = cursor.execute(sql, args)
             if hasattr(self, 'logger'):
                 self.logger.info('SQL execute success! %d row has been changed!' % ret)
-            #self.connection.commit()
+            # self.connection.commit()
             cursor.close()
             return True
         except pymysql.MySQLError as e:
             if hasattr(self, 'logger'):
-                self.logger.error('MySQL error! %s roll back ...'% str(e))
+                self.logger.error('MySQL error! %s roll back ...' % str(e))
             self.rollback()
             cursor.close()
             return False
@@ -96,6 +102,7 @@ class Mysql():
         :param args:
         :return: 查询结果, 返回一个二维list
         '''
+        self.__reconnect()
         cursor = self.connection.cursor()
         try:
             ret = cursor.execute(sql, args)
@@ -107,12 +114,13 @@ class Mysql():
             return data
         except pymysql.MySQLError as e:
             if hasattr(self, 'logger'):
-                self.logger.error('MySQL error! %s roll back ...'% str(e))
+                self.logger.error('MySQL error! %s roll back ...' % str(e))
             self.rollback()
             cursor.close()
             return None
 
     def truncate(self, table_name):
+        self.__reconnect()
         sql = 'truncate t_camera'
         cursor = self.connection.cursor()
         try:
@@ -123,6 +131,6 @@ class Mysql():
             cursor.close()
         except pymysql.MySQLError as e:
             if hasattr(self, 'logger'):
-                self.logger.error('MySQL error! %s roll back ...'% str(e))
+                self.logger.error('MySQL error! %s roll back ...' % str(e))
             self.rollback()
             cursor.close()
