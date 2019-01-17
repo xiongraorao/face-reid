@@ -1,11 +1,10 @@
 import configparser
+import datetime
 import json
-import os
+import multiprocessing
 import time
 import uuid
-import threading
-import multiprocessing
-from datetime import datetime
+
 import requests
 import schedule
 
@@ -15,9 +14,9 @@ from util import Kafka
 from util import Log
 from util import Mysql
 from util import bytes_to_base64
+from util import dbscan
 from util import time_to_date
 from util import trans_sqlin
-from util import dbscan
 
 logger = Log('index', 'logs/')
 config = configparser.ConfigParser()
@@ -33,7 +32,9 @@ db = Mysql(host=config.get('db', 'host'),
            password=config.get('db', 'password'),
            db=config.get('db', 'db'),
            charset=config.get('db', 'charset'))
+# db = Mysql('192.168.1.6', 13306, 'root', 'oceanai', 'face_reid')
 db.set_logger(logger)
+
 
 def download(url):
     '''
@@ -44,6 +45,7 @@ def download(url):
     content = requests.get(url).content
     b64 = bytes_to_base64(content)
     return b64
+
 
 def process(lock):
     # 1.从kafka消费消息
@@ -150,11 +152,12 @@ def process(lock):
 
             lantency = round(time.time()) - start
             count += 1
-            logger.info('process lantency: %d, count = %d' % (lantency,count))
+            logger.info('process lantency: %d, count = %d' % (lantency, count))
         else:
             logger.info('waiting re-cluster task over')
-            lock.wait(3600) # re-cluster 任务最大执行时长
-            re_cluster = False # 恢复运行
+            lock.wait(3600)  # re-cluster 任务最大执行时长
+            re_cluster = False  # 恢复运行
+
 
 def recluster_schedule(lock):
     logger = Log('re_cluster', 'logs/')
@@ -162,51 +165,74 @@ def recluster_schedule(lock):
     while True:
         schedule.run_pending()
         logger.info('re_cluster_schedule processing...')
-        time.sleep(50) # 50s检查一次，保证不会错过一分钟的时间
+        time.sleep(50)  # 50s检查一次，保证不会错过一分钟的时间
+
 
 def job(lock, logger):
     global re_cluster
     lock.acquire()
-    re_cluster = True # 暂停process
+    re_cluster = True  # 暂停process
 
     start = time.time()
-    last_day = str(datetime.fromtimestamp(time.time() - 24*3600))
-    response = requests.get('http://'+config.get('api', 'faiss_host')+config.get('api', 'faiss_port') + '/feature', params={'date': last_day})
-    if response == '-1':
-        logger.warning('get feature vectors failed, cannot do re-cluster')
+    current_datetime = datetime.datetime.now()
+    last_datetime = current_datetime + datetime.timedelta(days=-1)
+    earliest_datetime = last_datetime
+    sql = "select min(`timestamp`) from t_cluster"
+    select_result = db.select(sql)
+    if select_result is None:
+        logger.warning('get earliest timestamp failed')
     else:
-        logger.info('get feature vectors success')
-        indexs = response.text.strip().split('\n')
-        logger.info('feature total size: ', len(indexs))
-        rm_indexs = list(filter(lambda x:json.loads(x)['op'] == 'rm', indexs))
-        rm_ids = list(map(lambda x:json.loads(x)['id'], rm_indexs))
-        id_vectors = {}
-        for item in indexs:
-            d = json.loads(item)
-            if d['id'] not in rm_ids:
-                id_vectors[d['id']] = d['vector']
+        earliest_datetime = select_result[0][0]
 
-        # 重聚类
-        labels = dbscan(list(id_vectors.values()))
-        assert len(labels) == len(id_vectors), 'dbscan cluster error'
+    delta_days = (current_datetime - earliest_datetime).days
 
-        # 批量update
-        ids = list(id_vectors.keys())
-        case = ['when {} then {} '.format(ids[i], labels[i]) for i in range(len(ids))]
-        case = ''.join(case)
-        sql = "update t_cluster set cluster_id = case id {} end where id in {}".format(case, trans_sqlin(ids))
-        if db.update(sql):
-            db.commit()
-            logger.info('update t_cluster success, re-cluster complete')
+    # 只考虑过去1个月的， delta_days 最大为30
+    if delta_days > 30:
+        delta_days = 30
+    logger.info('recluster days: %d' % delta_days)
+    indexs = []
+    for day in range(delta_days):
+        select_day = last_datetime - datetime.timedelta(days=day)
+        response = requests.get(
+            'http://' + config.get('api', 'faiss_host') + config.get('api', 'faiss_port') + '/vector',
+            params={'date': select_day.strftime('%Y-%m-%d')})
+        # response = requests.get('http://192.168.1.6:2344/vector', params={'date': select_day.strftime('%Y-%m-%d')})
+        if response.status_code != 200 or response.text == '-1':
+            logger.warning('get feature vectors failed, cannot do re-cluster')
         else:
-            logger.warning('update t_cluster failed')
+            logger.info('get feature vectors success, datetime is: ', select_day.strftime('%Y-%m-%d'))
+            temp_indexs = response.text.strip().split('\n')
+            indexs += temp_indexs
+    logger.info('feature total size: ', len(indexs))
+    rm_indexs = list(filter(lambda x: json.loads(x)['op'] == 'rm', indexs))
+    rm_ids = list(map(lambda x: json.loads(x)['id'], rm_indexs))
+    id_vectors = {}
+    for item in indexs:
+        d = json.loads(item)
+        if d['id'] not in rm_ids:
+            id_vectors[d['id']] = d['vector']
 
-        # todo 是否删除dbscan的噪声数据
-        cost_time = round(time.time() - start)
-        logger.info('re-cluster cost time %d s'%cost_time)
-        re_cluster = False
-        lock.notify()
-        lock.release()
+    # 重聚类
+    labels = dbscan(list(id_vectors.values()))
+    assert len(labels) == len(id_vectors), 'dbscan cluster error'
+
+    # 批量update
+    ids = list(id_vectors.keys())
+    case = ['when {} then {} '.format(ids[i], labels[i]) for i in range(len(ids))]
+    case = ''.join(case)
+    sql = "update t_cluster set cluster_id = case id {} end where id in {}".format(case, trans_sqlin(ids))
+    if db.update(sql):
+        db.commit()
+        logger.info('update t_cluster success, re-cluster complete')
+    else:
+        logger.warning('update t_cluster failed')
+
+    cost_time = round(time.time() - start)
+    logger.info('re-cluster cost time %d s' % cost_time)
+    re_cluster = False
+    lock.notify()
+    lock.release()
+
 
 if __name__ == '__main__':
     process_cond = multiprocessing.Condition()

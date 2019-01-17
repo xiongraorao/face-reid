@@ -10,6 +10,6 @@ def dbscan(X, precomputed=False):
     if precomputed:
         labels = DBSCAN(eps=0.6, min_samples=10, metric='precomputed').fit_predict(X)
     else:
-        labels = DBSCAN(eps=0.6, min_samples=10, metric='cosine').fit_predict(X)
+        labels = DBSCAN(eps=0.5, min_samples=1, metric='cosine').fit_predict(X)
     return labels
 
