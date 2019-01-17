@@ -145,6 +145,8 @@ def grab_proc(url, rate, camera_id):
     logger.info('抓图进程终止')
 
 
+# todo 遍历proc_poll, 重新启动已经停止的进程
+
 @bp_camera.route('/add', methods=['POST'])
 def add():
     '''
@@ -246,7 +248,7 @@ def delete():
     if data['id'] in proc_pool:
         logger.info('停止抓图!')
         proc_pool[data['id']].terminate()  # 停止抓图进程
-        del proc_pool[data['id']] # 删除对应的进程
+        del proc_pool[data['id']]  # 删除对应的进程
 
     sql = "delete from `t_camera` where id = %s "
     result = db.delete(sql, (data['id']))
@@ -389,3 +391,30 @@ def state():
     logger.info('process_pool:', proc_pool)
     logger.info('camera state api return: ', ret)
     return json.dumps(ret)
+
+
+@bp_camera.route('/list', methods=['GET'])
+def listall():
+    '''
+    输出所有摄像头信息
+    :return:
+    '''
+    start = time.time()
+    ret = {'time_used': 0, 'rtn': -1}
+    sql = "select `id`, `name` from t_camera"
+    select_result = db.select(sql)
+    if select_result is not None:
+        logger.info('select from t_camera success')
+        infos = []
+        for item in select_result:
+            info = {'id': item[0], 'name': item[1]}
+            infos.append(info)
+        ret['infos'] = infos
+        ret['rtn'] = 0
+        ret['time_used'] = round((time.time() - start) * 1000)
+    else:
+        logger.info('select from t_camera fail')
+
+    logger.info('process_pool:', proc_pool)
+    logger.info('camera state api return: ', ret)
+    return json.dumps(ret, ensure_ascii=False)
