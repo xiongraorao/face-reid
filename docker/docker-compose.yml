@@ -157,7 +157,7 @@ services:
     hostname: faiss-cluster
     restart: always
     volumes:
-      - /data/docker/faiss-cluster:/home/app/faiss-py/logs
+      - /data/docker/faiss-cluster:/home/app/faiss-py/index
     ports:
       - 2344:2344
 
@@ -168,7 +168,7 @@ services:
     hostname: faiss-lib
     restart: always
     volumes:
-      - /data/docker/faiss-lib:/home/app/faiss-py/logs
+      - /data/docker/faiss-lib:/home/app/faiss-py/index
     ports:
       - 2345:2344
 
