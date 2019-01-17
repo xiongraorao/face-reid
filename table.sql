@@ -16,8 +16,9 @@ CREATE TABLE IF NOT EXISTS `t_cluster`(
   `id` INT PRIMARY KEY AUTO_INCREMENT COMMENT '人脸特征的索引ID, 样本ID',
   `cluster_id` VARCHAR(100) NOT NULL COMMENT '动态库聚类的ID',
   `uri` VARCHAR(100) NOT NULL COMMENT '抓拍人员的URI',
-  `timestamp` TIMESTAMP NOT NULL COMMENT '抓拍时间',
-  `camera_id` INT NOT NULL COMMENT '抓拍摄像头的ID'
+  `timestamp` TIMESTAMP NULL COMMENT '抓拍时间',
+  `camera_id` INT NOT NULL COMMENT '抓拍摄像头的ID',
+  `update_time` TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '重聚类的修改时间'
 );
 CREATE INDEX cluster ON `t_cluster`(cluster_id); # 给动态库的cluster创建索引, 用于轨迹查询
 
