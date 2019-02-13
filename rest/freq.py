@@ -40,9 +40,9 @@ def freq():
     '''
     start = time.time()
     data = request.data.decode('utf-8')
-    necessary_params = {'cluster_id', 'freq', 'start', 'end', 'start_pos', 'limit'}
-    default_params = {'query_id': -1, 'camera_ids': 'all', 'order': 1}
-    ret = {'time_used': 0, 'rtn': -1, 'query_id': -1}
+    necessary_params = {'freq', 'start', 'end', 'start_pos', 'limit'}
+    default_params = {'camera_ids': 'all'}
+    ret = {'time_used': 0, 'rtn': -1}
     try:
         data = json.loads(data)
     except json.JSONDecodeError:
@@ -56,8 +56,8 @@ def freq():
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
     # check start end 格式问题
-    p = [G_RE['datetime'], G_RE['datetime'], G_RE['num'], G_RE['num'], G_RE['num'], G_RE['num']]
-    v = [data['start'], data['end'], data['cluster_id'], data['freq'], data['start_pos'], data['limit']]
+    p = [G_RE['datetime'], G_RE['datetime'], G_RE['num'], G_RE['num'], G_RE['num']]
+    v = [data['start'], data['end'], data['freq'], data['start_pos'], data['limit']]
     legal = check_param_value(p, v)
     if not legal:
         logger.warning(GLOBAL_ERR['value_err'])
@@ -66,10 +66,8 @@ def freq():
     data = update_param(default_params, data)
 
     if data['camera_ids'] == 'all':
-        sql = "select timestamp from `t_cluster` where timestamp between %s and %s " \
-              "and cluster_id = %s order by timestamp desc limit %s, %s"
-        select_result = db.select(sql,
-                                  (data['start'], data['end'], data['cluster_id'], data['start_pos'], data['limit']))
+        sql = "select cluster_id, timestamp, uri, camera_id from `t_cluster` where timestamp between %s and %s order by timestamp desc"
+        select_result = db.select(sql, (data['start'], data['end']))
         if select_result is None:
             logger.warning('SQL select exception')
             ret['rtn'] = -2
@@ -80,20 +78,43 @@ def freq():
             ret['message'] = GLOBAL_ERR['null']
         else:
             logger.info('select success')
-            raw_result = {}
-            result = []
+            cluster_ts = {}  # cluster_id times_stamp
+            cluster_anchors = {}  # cluster_id anchor_img
             for item in select_result:
-                # item 为datatime类型
-                key = str(item[0].date())  # 2018-12-14
-                raw_result[key] = 1 if key not in raw_result else raw_result[key] + 1
-            for k, v in raw_result.items():
-                if v < data['freq']:
-                    del raw_result[k]
+                if item[0] not in cluster_ts:
+                    cluster_ts[item[0]] = [item[1]]
                 else:
-                    temp = {'data': k, 'times': v}
-                    result.append(temp)
-            ret['total'] = len(raw_result)
-            ret['results'] = result
+                    cluster_ts[item[0]].append(item[1])
+                if item[0] not in cluster_anchors:
+                    cluster_anchors[item[0]] = [(item[2], item[3])]
+                else:
+                    cluster_anchors[item[0]].append((item[2], item[3]))
+            results = []
+            for cluster_id in cluster_ts:
+                raw_result = {}
+                for ts in cluster_ts[cluster_id]:
+                    key = str(ts.date())  # 2018-12-14
+                    raw_result[key] = 1 if key not in raw_result else raw_result[key] + 1
+                if len(raw_result) < data['freq']:
+                    continue
+                else:
+                    person_info = {'cluster_id': cluster_id, 'anchor_img': cluster_anchors[cluster_id][0][0],
+                                   'last_camera': cluster_anchors[cluster_id][0][1]}
+                    person_freq = []
+                    for k, v in raw_result.items():
+                        temp = {'date': k, 'times': v}
+                        person_freq.append(temp)
+                    person_info['freq'] = person_freq
+                    dts = sorted(cluster_ts[cluster_id])
+                    person_info['start_time'] = dts[0].strftime('%Y-%m-%d %H:%M:%S')
+                    person_info['end_time'] = dts[-1].strftime('%Y-%m-%d %H:%M:%S')
+                results.append(person_info)
+
+            ret['total'] = len(results)
+            if data['start_pos'] + data['limit'] < len(results):
+                ret['results'] = results[data['start_pos']:(data['start_pos'] + data['limit'])]
+            else:
+                ret['results'] = results[data['start_pos']:]
             ret['rtn'] = 0
             ret['message'] = FREQ_ERR['success']
             ret['time_used'] = round((time.time() - start) * 1000)

@@ -6,13 +6,14 @@
     - [删除](#%E5%88%A0%E9%99%A4)
     - [修改](#%E4%BF%AE%E6%94%B9)
     - [状态查询](#%E7%8A%B6%E6%80%81%E6%9F%A5%E8%AF%A2)
+    - [显示所有摄像头](#%E6%98%BE%E7%A4%BA%E6%89%80%E6%9C%89%E6%91%84%E5%83%8F%E5%A4%B4)
   - [搜索](#%E6%90%9C%E7%B4%A2)
-    - [搜索1](#%E6%90%9C%E7%B4%A21)
+    - [搜索1 -- （异步方法）](#%E6%90%9C%E7%B4%A21----%E5%BC%82%E6%AD%A5%E6%96%B9%E6%B3%95)
     - [搜索2](#%E6%90%9C%E7%B4%A22)
     - [搜索3](#%E6%90%9C%E7%B4%A23)
   - [轨迹查询](#%E8%BD%A8%E8%BF%B9%E6%9F%A5%E8%AF%A2)
   - [频次查询](#%E9%A2%91%E6%AC%A1%E6%9F%A5%E8%AF%A2)
-  - [同行人查询](#%E5%90%8C%E8%A1%8C%E4%BA%BA%E6%9F%A5%E8%AF%A2)
+  - [同行人查询 -- (异步方法)](#%E5%90%8C%E8%A1%8C%E4%BA%BA%E6%9F%A5%E8%AF%A2----%E5%BC%82%E6%AD%A5%E6%96%B9%E6%B3%95)
   - [人像库](#%E4%BA%BA%E5%83%8F%E5%BA%93)
     - [新建](#%E6%96%B0%E5%BB%BA)
     - [删除](#%E5%88%A0%E9%99%A4-1)
@@ -117,7 +118,7 @@
 ### 状态查询
 
 请求地址：http://host:port/camera/status
-请求方式：get
+请求方式：post
 请求类型：application/json
 
 **输入参数：**
@@ -135,9 +136,30 @@
 | message |	`string` | 请求执行状态描述
 | status | `int` | 1运行中；2已结束，3 无法连接
 
+### 显示所有摄像头
+
+请求地址：http://host:port/camera/list
+请求方式：get
+请求类型：application/json
+
+**输入参数：**
+
+空
+
+**输出参数：**
+
+| 参数名 | 参数类型 | 参数说明
+|:---:|:---:|:---:|
+| time_used | `int` | 整个请求所花费的时间，单位为毫秒
+| rtn | `int` | 请求执行状态；0表示接收正常，非0表示接收异常
+| infos | `Array<Object>` | 摄像头的信息列表
+| infos.id | `int` | 摄像头数据库中的ID
+| infos.name | `string` | 摄像头的名字, 用于标识该摄像头的字符串
+
+
 ## 搜索
 
-### 搜索1
+### 搜索1 -- （异步方法）
 
 功能：给定目标，实现全库检索，返回聚类的id（cluster_id)
 
@@ -287,7 +309,9 @@
 
 ## 频次查询
 
-功能：输入目标cluster_id, 搜索这个cluster_id在限定时间和摄像头中出现的频次
+~~功能：输入目标cluster_id, 搜索这个cluster_id在限定时间和摄像头中出现的频次~~
+
+功能：查找动态库中一些人的频次超过预定的频次的人
 
 请求地址：http://host:port/freq
 请求方式：post
@@ -319,7 +343,40 @@
 | results.date | `Date` | 输入时间范围内的日期，2018-08-09
 | results.times | `int` | 该cluster在该日期中出现的次数
 
-## 同行人查询
+
+**修改后的频次查询接口:**
+
+**输入参数：**
+
+| 参数名 | 是否必选 | 参数类型 | 参数说明
+|:---:|:---:|:---:|:---:|
+| freq | 是 | `int` | 目标频次，大于该频次将被找到
+| start | 是 | `Datetime` | 目标频次统计开始时间，精确到秒
+| end | 是 | `Datetime` | 目标频次统计结束时间，精确到秒
+| start_pos | 是 | `int` | 从第几个开始返回
+| limit | 是 | `int` | 返回至多多少个结果
+| camera_ids | 否 | `Array<int>` | 关注的摄像头列表，默认为所有
+
+
+**输出参数：**
+
+| 参数名 | 参数类型 | 参数说明
+|:---:|:---:|:---:|
+| time_used | `int` | 整个请求所花费的时间，单位为毫秒
+| rtn | `int` | 请求执行状态；0表示接收正常，非0表示接收异常
+| message |	`string` | 请求执行状态描述
+| total | `int` | 总结果数， results的长度
+| results | `Array<Object>` | 频次查询的结果
+| results.cluster_id | `string` | 查询到的行人的cluster_id
+| results.anchor_img | `string` | 查询到的行人的锚点图像
+| results.start_time | `Datetime` | 开始出现的时间，2018-08-09 14:00:00
+| results.end_time | `Datetime` | 最后出现的时间，2018-08-09 14:00:00
+| results.last_camera | `string` | 最后出现的摄像头id
+| results.freq | `Array<Object>` | 行人出现的日期--次数，长度应该是大于目标频次的
+| results.freq.date | `Date` | 出现的日期
+| results.freq.times | `int` | 对应这个日期该行人出现的次数
+
+## 同行人查询 -- (异步方法)
 
 功能：输入目标cluster_id, 搜索这个cluster_id在限定时间和摄像头中的同行人
 
