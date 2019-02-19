@@ -70,7 +70,7 @@ def grab_proc(url, rate, camera_id):
 
     while True:
         try:
-            img = q.get(timeout=20)
+            img = q.get(timeout=300)
             if detect_count % frame_internal == 0:
                 detect_count = 0
                 b64 = mat_to_base64(img)
@@ -144,8 +144,15 @@ def grab_proc(url, rate, camera_id):
         detect_count += 1
     logger.info('抓图进程终止')
 
-
-# todo 遍历proc_poll, 重新启动已经停止的进程
+def watch_dog(logger):
+    # 定时重启process_pool 中的抓图进程
+    logger.info('process_pool status check start ...')
+    for id, process in proc_pool.items():
+        if not process.is_alive():
+            process.start()
+            logger.info('restart grab progress, camera_id = %s'% id)
+    logger.info('proc_pool status: ',  proc_pool)
+    logger.info('process_pool status check end ...')
 
 @bp_camera.route('/add', methods=['POST'])
 def add():
