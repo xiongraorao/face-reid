@@ -2,12 +2,13 @@ import configparser
 import json
 import threading
 import time
+import schedule
 
 import pymysql
 import requests
 from flask import Flask
 
-from rest import bp_camera, bp_search, bp_peer, bp_freq, bp_repo, bp_trace
+from rest import bp_camera, bp_search, bp_peer, bp_freq, bp_repo, bp_trace, watch_dog
 from util import Mysql
 
 app = Flask(__name__)
@@ -152,10 +153,18 @@ def init():
         print('request parmas: ', json.dumps(data_request, ensure_ascii=False))
         response = requests.post(url, data=json.dumps(data_request), headers=headers)
         logger.info('camera id =', id, ', response: ', response.json())
+        time.sleep(5) # 延迟启动抓图进程，否则起不来
     logger.info('camera task initialize complete')
 
+def check_grab():
+    logger.info('====start process_pool watch dog====')
+    schedule.every(5).minutes.do(watch_dog, logger) # 每间隔5分钟检查一次抓图进程
+    while True:
+        schedule.run_pending()
 
 if __name__ == '__main__':
     t = threading.Thread(target=init)
     t.start()
+    t2 = threading.Thread(target=check_grab)
+    t2.start()
     app.run('0.0.0.0')
