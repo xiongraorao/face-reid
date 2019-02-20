@@ -5,6 +5,7 @@ Created on 2019-02-20 20:35
 @author Xiong Raorao
 
 """
+import configparser
 import os
 import sys
 import time
@@ -20,7 +21,10 @@ from util import Log
 from util import Faiss
 from util import trans_sqlin, trans_sqlinsert, get_db_client
 
-threshold = 0.75  # 用于过滤找到的topk人脸
+config = configparser.ConfigParser()
+config.read('./app.config')
+threshold = config.get('sys', 'threshold')  # 用于过滤找到的topk人脸
+
 
 def search_proc(data, query_id, config):
     '''

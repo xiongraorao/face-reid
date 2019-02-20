@@ -29,7 +29,7 @@ bp_search = Blueprint('search', __name__)
 lib_searcher = Faiss(config.get('api', 'faiss_lib_host'), config.getint('api', 'faiss_lib_port'))
 face_tool = Face(config.get('api', 'face_server'))
 proc_pool = {}
-threshold = 0.75  # 用于过滤找到的topk人脸
+threshold = config.get('sys', 'threshold')  # 用于过滤找到的topk人脸
 process_pool = mp.Pool(processes=20)
 
 
