@@ -16,33 +16,23 @@ if sup not in sys.path:
 
 from .error import *
 from .param_tool import check_param_key, update_param, check_param_value, G_RE
-from util import Log, time_to_date
-from util import Mysql
-from util import trans_sqlin, trans_sqlinsert
+from util import Log, time_to_date, trans_sqlin, trans_sqlinsert, get_db_client
 
 logger = Log('peer', 'logs/')
 config = configparser.ConfigParser()
 config.read('./app.config')
-
-db = Mysql(host=config.get('db', 'host'),
-           port=config.getint('db', 'port'),
-           user=config.get('db', 'user'),
-           password=config.get('db', 'password'),
-           db=config.get('db', 'db'),
-           charset=config.get('db', 'charset'))
-db.set_logger(logger)
-
 bp_peer = Blueprint('peer', __name__)
 proc_pool = {}
 
 
-def compute(data, logger, query_id):
+def compute(data, logger, query_id, config):
     '''
     同行人计算的进程，异步查询结果，将结果写入数据库
     :param data:
     :param logger:
     :return:
     '''
+    db = get_db_client(config)
     # 1. 计算目标cluster的时间和摄像头
     if data['camera_ids'] != 'all':
         sql = "select `timestamp`, `camera_id`, `uri` from `t_cluster` where `cluster_id` = %s and `timestamp` between %s and %s and `camera_id` in {}".format(
@@ -142,6 +132,7 @@ def compute(data, logger, query_id):
                     logger.info('insert to t_peer_detail successfully')
                     db.commit()
     logger.info('peer compute process(%d) has done' % os.getpid())
+    db.close()
 
 
 @bp_peer.route('/peer', methods=['POST'])
@@ -151,6 +142,7 @@ def peer():
     :return:
     '''
     start = time.time()
+    db = get_db_client(config, logger)
     data = request.data.decode('utf-8')
     necessary_params = {'cluster_id', 'start', 'end', 'gap', 'min_times', 'threshold', 'start_pos', 'limit'}
     default_params = {'query_id': -1, 'camera_ids': 'all'}
@@ -168,7 +160,8 @@ def peer():
         ret['message'] = GLOBAL_ERR['param_err']
         return json.dumps(ret)
     # check start end 格式问题
-    p = [G_RE['datetime'], G_RE['datetime'], G_RE['num'], G_RE['num'], G_RE['num'], G_RE['num'], G_RE['num'], r'^0\.\d{1,3}']
+    p = [G_RE['datetime'], G_RE['datetime'], G_RE['num'], G_RE['num'], G_RE['num'], G_RE['num'], G_RE['num'],
+         r'^0\.\d{1,3}']
     v = [data['start'], data['end'], data['cluster_id'], data['gap'], data['start_pos'], data['limit'],
          data['min_times'], data['threshold']]
     legal = check_param_value(p, v)
@@ -181,7 +174,7 @@ def peer():
     # 1. 启动查询进程，查询结果放到数据库中
     if data['query_id'] == -1:
         query_id = round(time.time())
-        p = Process(target=compute, args=(data, logger, query_id))
+        p = Process(target=compute, args=(data, logger, query_id, config))
         p.daemon = True
         p.start()
         proc_pool[query_id] = p
@@ -220,7 +213,7 @@ def peer():
                 logger.info('select from t_peer success')
                 ret['rtn'] = 0
                 ret['query_id'] = data['query_id']
-                clusters = set(map(lambda x:x[0], select_result))
+                clusters = set(map(lambda x: x[0], select_result))
                 ret['total'] = len(clusters)
                 ret['message'] = PEER_ERR['success']
                 ret['status'] = PEER_ERR['done']
@@ -230,11 +223,11 @@ def peer():
                 for item in select_result:
                     base_info = (item[0], item[1], item[2], item[3], item[4], item[5])
                     if base_info not in info:
-                        info[base_info] = [(item[6],item[7],item[8],item[9],item[10])]
+                        info[base_info] = [(item[6], item[7], item[8], item[9], item[10])]
                     else:
-                        info[base_info].append((item[6],item[7],item[8],item[9],item[10]))
+                        info[base_info].append((item[6], item[7], item[8], item[9], item[10]))
 
-                for k,v in info.items():
+                for k, v in info.items():
                     result = {'cluster_id': k[0], 'anchor_img': k[1], 'times': k[2],
                               'start_time': k[3].strftime('%Y-%m-%d %H:%M:%S'),
                               'end_time': k[4].strftime('%Y-%m-%d %H:%M:%S'), 'prob': k[5]}
@@ -250,4 +243,5 @@ def peer():
                 ret['results'] = results
                 ret['time_used'] = round((time.time() - start) * 1000)
     logger.info('peer api return: ', ret)
+    db.close()
     return json.dumps(ret)

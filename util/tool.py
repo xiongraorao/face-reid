@@ -2,6 +2,7 @@ import base64
 import time
 
 import requests
+from .mysql import Mysql
 
 
 def time_to_date(timestamp):
@@ -68,3 +69,15 @@ def get_as_base64(url):
         return None
     b = res.content
     return base64.b64encode(b).decode('utf-8')
+
+def get_db_client(config, logger = None):
+    db = Mysql(host=config.get('db', 'host'),
+               port=config.getint('db', 'port'),
+               user=config.get('db', 'user'),
+               password=config.get('db', 'password'),
+               db=config.get('db', 'db'),
+               charset=config.get('db', 'charset'))
+    if logger is not None:
+        db.set_logger(logger)
+    return db
+
