@@ -14,21 +14,11 @@ if sup not in sys.path:
 
 from .error import *
 from .param_tool import check_param_key, update_param, check_param_value, G_RE
-from util import Log
-from util import Mysql
+from util import Log, get_db_client
 
 logger = Log('freq', 'logs/')
 config = configparser.ConfigParser()
 config.read('./app.config')
-
-db = Mysql(host=config.get('db', 'host'),
-           port=config.getint('db', 'port'),
-           user=config.get('db', 'user'),
-           password=config.get('db', 'password'),
-           db=config.get('db', 'db'),
-           charset=config.get('db', 'charset'))
-db.set_logger(logger)
-
 bp_freq = Blueprint('freq', __name__)
 
 
@@ -39,6 +29,7 @@ def freq():
     :return:
     '''
     start = time.time()
+    db = get_db_client(config, logger)
     data = request.data.decode('utf-8')
     necessary_params = {'freq', 'start', 'end', 'start_pos', 'limit'}
     default_params = {'camera_ids': 'all'}
@@ -119,4 +110,5 @@ def freq():
             ret['message'] = FREQ_ERR['success']
             ret['time_used'] = round((time.time() - start) * 1000)
     logger.info('frequency api return: ', ret)
+    db.close()
     return json.dumps(ret)

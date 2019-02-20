@@ -14,22 +14,13 @@ if sup not in sys.path:
 
 from .error import *
 from .param_tool import check_param_key, update_param, G_RE, check_param_value
-from util import Log, trans_sqlin
-from util import Mysql
+from util import Log, trans_sqlin, get_db_client
 
 logger = Log('trace', 'logs/')
 config = configparser.ConfigParser()
 config.read('./app.config')
-
-db = Mysql(host=config.get('db', 'host'),
-           port=config.getint('db', 'port'),
-           user=config.get('db', 'user'),
-           password=config.get('db', 'password'),
-           db=config.get('db', 'db'),
-           charset=config.get('db', 'charset'))
-db.set_logger(logger)
-
 bp_trace = Blueprint('trace', __name__)
+
 
 @bp_trace.route('/trace', methods=['POST'])
 def trace():
@@ -38,8 +29,9 @@ def trace():
     :return:
     '''
     start = time.time()
+    db = get_db_client(config, logger)
     data = request.data.decode('utf-8')
-    necessary_params = {'cluster_id','start', 'end', 'start_pos', 'limit'}
+    necessary_params = {'cluster_id', 'start', 'end', 'start_pos', 'limit'}
     default_params = {'query_id': -1, 'camera_ids': 'all', 'order': 1}
     ret = {'time_used': 0, 'rtn': -1, 'query_id': -1}
     try:
@@ -89,4 +81,5 @@ def trace():
         ret['message'] = TRACE_ERR['success']
         ret['time_used'] = round((time.time() - start) * 1000)
     logger.info('trace api return: ', ret)
+    db.close()
     return json.dumps(ret)

@@ -7,5 +7,5 @@ from .mysql import Mysql
 # from .pedestrian import Ped
 from .search import Faiss
 from .seaweed import WeedClient
-from .tool import date_to_time, time_to_date, trans_sqlin, trans_sqlinsert,get_as_base64
+from .tool import date_to_time, time_to_date, trans_sqlin, trans_sqlinsert,get_as_base64, get_db_client
 from .cluster import dbscan

@@ -18,26 +18,16 @@ if sup not in sys.path:
 from .error import *
 from .param_tool import check_param_key, update_param, check_param_value, CAM_RE
 
-from util import Face, mat_to_base64, base64_to_bytes, GrabJob
+from util import Face
 from util import Log
 from util import Kafka
-from util import Mysql
 from util import WeedClient
+from util import mat_to_base64, base64_to_bytes, GrabJob, get_db_client
 
 logger = Log('camera', 'logs/')
 config = configparser.ConfigParser()
 config.read('./app.config')
-
-db = Mysql(host=config.get('db', 'host'),
-           port=config.getint('db', 'port'),
-           user=config.get('db', 'user'),
-           password=config.get('db', 'password'),
-           db=config.get('db', 'db'),
-           charset=config.get('db', 'charset'))
-db.set_logger(logger)
-
 bp_camera = Blueprint('camera', __name__)
-
 proc_pool = {}
 
 track_internal = 3  # 跟踪间隔， 3秒
@@ -67,7 +57,6 @@ def grab_proc(url, rate, camera_id):
     q = queue.Queue(maxsize=100)
     t = GrabJob(q, camera_id, url, rate, Log('grab-proc' + str(os.getpid()) + '-thread', 'logs/'), config)
     t.start()
-
     while True:
         try:
             img = q.get(timeout=300)
@@ -144,15 +133,17 @@ def grab_proc(url, rate, camera_id):
         detect_count += 1
     logger.info('抓图进程终止')
 
+
 def watch_dog(logger):
     # 定时重启process_pool 中的抓图进程
     logger.info('process_pool status check start ...')
     for id, process in proc_pool.items():
         if not process.is_alive():
             process.start()
-            logger.info('restart grab progress, camera_id = %s'% id)
-    logger.info('proc_pool status: ',  proc_pool)
+            logger.info('restart grab progress, camera_id = %s' % id)
+    logger.info('proc_pool status: ', proc_pool)
     logger.info('process_pool status check end ...')
+
 
 @bp_camera.route('/add', methods=['POST'])
 def add():
@@ -161,6 +152,7 @@ def add():
     :return:
     '''
     start = time.time()
+    db = get_db_client(config, logger)
     data = request.data.decode('utf-8')
     necessary_params = {'url'}
     default_params = {'rate': 1, 'grab': 1, 'name': 'Default Camera'}
@@ -220,6 +212,7 @@ def add():
             logger.info('只添加摄像头，不抓图')
     logger.info('process_pool: ', proc_pool)
     logger.info('camera add api return: ', ret)
+    db.close()
     return json.dumps(ret)
 
 
@@ -230,6 +223,7 @@ def delete():
     :return:
     '''
     start = time.time()
+    db = get_db_client(config, logger)
     data = request.data.decode('utf-8')
     nessary_params = {'id'}
     default_params = {}
@@ -272,6 +266,7 @@ def delete():
         ret['message'] = CAM_ERR['fail']
     logger.info('process_pool:', proc_pool)
     logger.info('camera delete api return: ', ret)
+    db.close()
     return json.dumps(ret)
 
 
@@ -282,6 +277,7 @@ def update():
     :return:
     '''
     start = time.time()
+    db = get_db_client(config, logger)
     data = request.data.decode('utf-8')
     nessary_params = {'url', 'id'}
     default_params = {'rate': 1, 'grab': 1, 'name': 'Default Camera'}
@@ -347,6 +343,7 @@ def update():
 
     logger.info('process_pool:', proc_pool)
     logger.info('camera update api return: ', ret)
+    db.close()
     return json.dumps(ret)
 
 
@@ -357,6 +354,7 @@ def state():
     :return:
     '''
     start = time.time()
+    db = get_db_client(config, logger)
     data = request.data.decode('utf-8')
     nessary_params = {'id'}
     default_params = {}
@@ -397,6 +395,7 @@ def state():
 
     logger.info('process_pool:', proc_pool)
     logger.info('camera state api return: ', ret)
+    db.close()
     return json.dumps(ret)
 
 
@@ -407,6 +406,7 @@ def listall():
     :return:
     '''
     start = time.time()
+    db = get_db_client(config, logger)
     ret = {'time_used': 0, 'rtn': -1}
     sql = "select `id`, `name` from t_camera"
     select_result = db.select(sql)
@@ -424,4 +424,5 @@ def listall():
 
     logger.info('process_pool:', proc_pool)
     logger.info('camera state api return: ', ret)
+    db.close()
     return json.dumps(ret, ensure_ascii=False)

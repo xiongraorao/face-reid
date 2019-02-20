@@ -15,25 +15,15 @@ if sup not in sys.path:
 
 from .error import *
 from .param_tool import check_param_key, update_param
-from util import Face, WeedClient, base64_to_bytes, trans_sqlin, trans_sqlinsert
+from util import Face
 from util import Log
-from util import Mysql
 from util import Faiss
-from util import get_as_base64
+from util import get_as_base64, get_db_client, WeedClient, base64_to_bytes, trans_sqlin, trans_sqlinsert
 
 logger = Log('repository', 'logs/')
 config = configparser.ConfigParser()
 config.read('./app.config')
-
-db = Mysql(host=config.get('db', 'host'),
-           port=config.getint('db', 'port'),
-           user=config.get('db', 'user'),
-           password=config.get('db', 'password'),
-           db=config.get('db', 'db'),
-           charset=config.get('db', 'charset'))
-db.set_logger(logger)
 bp_repo = Blueprint('repository', __name__)
-
 face_tool = Face(config.get('api', 'face_server'))
 searcher = Faiss(config.get('api', 'faiss_host'), config.getint('api', 'faiss_port'))
 lib_searcher = Faiss(config.get('api', 'faiss_lib_host'), config.getint('api', 'faiss_lib_port'))
@@ -49,9 +39,10 @@ def contact(start_id, length):
     :param length: t_person 表上次插入的长度
     :return:
     '''
+    db = get_db_client(config, logger)
     # 1. 查询数据库
     sql = "select `id`, `uri` from `t_person` where id between %s and %s"
-    select_result = db.select(sql, (start_id, start_id + length -1))
+    select_result = db.select(sql, (start_id, start_id + length - 1))
     ids = []
     img_base64 = []
     landmarks = []
@@ -116,7 +107,7 @@ def contact(start_id, length):
                 t_result = db.select(t_sql)
                 if t_result is None or len(t_result) == 0:
                     logger.info('select t_cluster error or t_cluster is null or person not match to t_cluster')
-                    ids.pop(i) # 去掉不合格的id，否则后面insert的id对应错误
+                    ids.pop(i)  # 去掉不合格的id，否则后面insert的id对应错误
                 else:
                     logger.info('select t_cluster successfully')
                     clusters = list(map(lambda x: x[0], t_result))
@@ -145,6 +136,7 @@ def contact(start_id, length):
             else:
                 logger.info('insert data into t_contact successfully')
                 db.commit()
+    db.close()
 
 
 @bp_repo.route('/add', methods=['POST'])
@@ -154,6 +146,7 @@ def repo_add():
     :return:
     '''
     start = time.time()
+    db = get_db_client(config, logger)
     data = request.data.decode('utf-8')
     necessary_params = {'name'}
     default_params = {}
@@ -187,6 +180,7 @@ def repo_add():
         db.commit()
 
     logger.info('repository add api return: ', ret)
+    db.close()
     return json.dumps(ret)
 
 
@@ -197,6 +191,7 @@ def repo_del():
     :return:
     '''
     start = time.time()
+    db = get_db_client(config, logger)
     data = request.data.decode('utf-8')
     necessary_params = {'id'}
     default_params = {}
@@ -229,6 +224,7 @@ def repo_del():
         ret['message'] = REPO_ERR['fail']
 
     logger.info('repository delete api return: ', ret)
+    db.close()
     return json.dumps(ret)
 
 
@@ -239,6 +235,7 @@ def repo_update():
     :return:
     '''
     start = time.time()
+    db = get_db_client(config, logger)
     data = request.data.decode('utf-8')
     necessary_params = {'id', 'name'}
     default_params = {}
@@ -271,6 +268,7 @@ def repo_update():
         ret['message'] = REPO_ERR['fail']
 
     logger.info('repository update api return: ', ret)
+    db.close()
     return json.dumps(ret)
 
 
@@ -281,6 +279,7 @@ def repos():
     :return:
     '''
     start = time.time()
+    db = get_db_client(config, logger)
     ret = {'time_used': 0, 'rtn': -1}
     sql = "select t_lib.repository_id, t_lib.name, count(*) from `t_lib` left join t_person p on p.repository_id = t_lib.repository_id group by t_lib.repository_id"
     result = db.select(sql)
@@ -300,6 +299,7 @@ def repos():
         ret['time_used'] = round((time.time() - start) * 1000)
 
     logger.info('repository get all api return: ', ret)
+    db.close()
     return json.dumps(ret)
 
 
@@ -310,6 +310,7 @@ def picture_add():
     :return:
     '''
     start = time.time()
+    db = get_db_client(config, logger)
     data = request.data.decode('utf-8')
     necessary_params = {'repository_id', 'path'}
     default_params = {}
@@ -359,9 +360,9 @@ def picture_add():
         ret['time_used'] = round((time.time() - start) * 1000)
         db.commit()
         # 启动一个线程完成静态库和动态库的关联过程
-        t = threading.Thread(target=contact, args=(insert_result,len(values)))
+        t = threading.Thread(target=contact, args=(insert_result, len(values)))
         t.start()
-
+    db.close()
     return json.dumps(ret)
 
 
@@ -372,6 +373,7 @@ def picture_add2():
     :return:
     '''
     start = time.time()
+    db = get_db_client(config, logger)
     data = request.data.decode('utf-8')
     necessary_params = {'repository_id', 'images'}
     default_params = {}
@@ -422,4 +424,5 @@ def picture_add2():
     # 启动一个线程完成静态库和动态库的关联过程
     t = threading.Thread(target=contact, args=(data['repository_id'],))
     t.start()
+    db.close()
     return json.dumps(ret)
