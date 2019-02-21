@@ -28,7 +28,7 @@ face_tool = Face(config.get('api', 'face_server'))
 searcher = Faiss(config.get('api', 'faiss_host'), config.getint('api', 'faiss_port'))
 lib_searcher = Faiss(config.get('api', 'faiss_lib_host'), config.getint('api', 'faiss_lib_port'))
 weed_client = WeedClient(config.get('weed', 'host'), config.getint('weed', 'port'))
-threshold = config.get('sys', 'threshold')  # 用于过滤找到的topk人脸
+threshold = config.getfloat('sys', 'threshold')  # 用于过滤找到的topk人脸
 topk = 100
 
 

@@ -29,8 +29,9 @@ bp_search = Blueprint('search', __name__)
 lib_searcher = Faiss(config.get('api', 'faiss_lib_host'), config.getint('api', 'faiss_lib_port'))
 face_tool = Face(config.get('api', 'face_server'))
 proc_pool = {}
-threshold = config.get('sys', 'threshold')  # 用于过滤找到的topk人脸
+threshold = config.getfloat('sys', 'threshold')  # 用于过滤找到的topk人脸
 process_pool = mp.Pool(processes=20)
+process_status = {} # 进程状态池子
 
 
 @bp_search.route('/all/syn', methods=['POST'])
@@ -63,16 +64,25 @@ def searchsyn():
     search_proc(data, query_id=data['query_id'], config=config)
     logger.info('query task 已经执行完毕')
 
+    ret = __find(db, data, logger)
+    ret['time_used'] = round((time.time() - start) * 1000)
+    logger.info('search1 api return: ', ret)
+    db.close()
+    return json.dumps(ret)
+
+def __find(db,data, logger):
+    ret = {'time_used': 0, 'rtn': -1, 'query_id': -1}
+    logger.info('query task 已经执行完毕')
     sql = '''
-    select e.cluster_id, e.anchor, e.similarity, f.person_id, f.repository_id, f.repo_name from
-    (select x.cluster_id, x.similarity , y.anchor from (select cluster_id, similarity from t_search where query_id = %s order by `similarity` desc limit %s,%s ) 
-    x left join
-    (select a.cluster_id, a.uri anchor from t_cluster a inner join (select cluster_id, max(`timestamp`) `anchor_time` from t_cluster 
-    group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time group by a.cluster_id ) y on x.cluster_id = y.cluster_id) e left join 
-    (select c.id, c.name person_id, c.cluster_id, c.repository_id, d.name repo_name from 
-    (select a.id,a.cluster_id, b.name, b.repository_id from (select id,cluster_id from t_contact) a left join t_person b on a.id = b.id ) c 
-    left join t_lib d on c.repository_id = d.repository_id) f on e.cluster_id = f.cluster_id
-    '''
+                select e.cluster_id, e.anchor, e.similarity, f.person_id, f.repository_id, f.repo_name from
+                (select x.cluster_id, x.similarity , y.anchor from (select cluster_id, similarity from t_search where query_id = %s order by `similarity` desc limit %s,%s ) 
+                x left join
+                (select a.cluster_id, a.uri anchor from t_cluster a inner join (select cluster_id, max(`timestamp`) `anchor_time` from t_cluster 
+                group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time group by a.cluster_id ) y on x.cluster_id = y.cluster_id) e left join 
+                (select c.id, c.name person_id, c.cluster_id, c.repository_id, d.name repo_name from 
+                (select a.id,a.cluster_id, b.name, b.repository_id from (select id,cluster_id from t_contact) a left join t_person b on a.id = b.id ) c 
+                left join t_lib d on c.repository_id = d.repository_id) f on e.cluster_id = f.cluster_id
+                '''
     select_result = db.select(sql, (data['query_id'], data['start_pos'], data['limit']))
     if select_result is None or len(select_result) == 0:
         logger.info('mysql db select error, please check')
@@ -105,12 +115,7 @@ def searchsyn():
             result['repository_infos'] = repo_infos
             results.append(result)
         ret['results'] = results
-        ret['time_used'] = round((time.time() - start) * 1000)
-
-    logger.info('search1 api return: ', ret)
-    db.close()
-    return json.dumps(ret)
-
+    return ret
 
 @bp_search.route('/all', methods=['POST'])
 def search():
@@ -141,7 +146,8 @@ def search():
     # 1. 启动查询进程，将查询结果放到数据库中
     if data['query_id'] == -1:  # 第一次查询，启动查询进程
         query_id = int(str(hash(uuid.uuid4()))[:9])
-        process_pool.apply_async(search_proc, (data, query_id, config))
+        res = process_pool.apply_async(search_proc, (data, query_id, config))
+        process_status[query_id] = res
         ret['time_used'] = round((time.time() - start) * 1000)
         ret['rtn'] = 0
         ret['message'] = SEARCH_ERR['start']
@@ -150,55 +156,34 @@ def search():
     else:
         # 2. 第二次查询
         tmp = db.select("select count(*) from t_search where query_id = %s", data['query_id'])
-        if tmp is None or tmp[0][0] == 0:
-            logger.info('query task %s 不存在或运行中' % data['query_id'])
+        if data['query_id'] not in process_status and (tmp is None or tmp[0][0] == 0):
+            logger.info('query task %s 不存在' % data['query_id'])
             ret['rtn'] = -3
             ret['message'] = SEARCH_ERR['query_not_exist']
         else:
-            logger.info('query task 已经执行完毕')
-            sql = '''
-            select e.cluster_id, e.anchor, e.similarity, f.person_id, f.repository_id, f.repo_name from
-            (select x.cluster_id, x.similarity , y.anchor from (select cluster_id, similarity from t_search where query_id = %s order by `similarity` desc limit %s,%s ) 
-            x left join
-            (select a.cluster_id, a.uri anchor from t_cluster a inner join (select cluster_id, max(`timestamp`) `anchor_time` from t_cluster 
-            group by cluster_id) b on a.cluster_id = b.cluster_id and a.timestamp = b.anchor_time group by a.cluster_id ) y on x.cluster_id = y.cluster_id) e left join 
-            (select c.id, c.name person_id, c.cluster_id, c.repository_id, d.name repo_name from 
-            (select a.id,a.cluster_id, b.name, b.repository_id from (select id,cluster_id from t_contact) a left join t_person b on a.id = b.id ) c 
-            left join t_lib d on c.repository_id = d.repository_id) f on e.cluster_id = f.cluster_id
-            '''
-            select_result = db.select(sql, (data['query_id'], data['start_pos'], data['limit']))
-            if select_result is None or len(select_result) == 0:
-                logger.info('mysql db select error, please check')
-                ret['rtn'] = -2
-                ret['query_id'] = data['query_id']
-                ret['message'] = SEARCH_ERR['null']
-            else:
-                logger.info('search success, length =', len(select_result))
-                ret['rtn'] = 0
-                ret['query_id'] = data['query_id']
-                clusters = set(map(lambda x: x[0], select_result))
-                ret['total'] = len(clusters)
-                ret['message'] = SEARCH_ERR['success']
-                ret['status'] = SEARCH_ERR['done']
-
-                results = []
-                info = {}
-                for item in select_result:
-                    base_info = (item[0], item[1], item[2])
-                    if base_info not in info:
-                        info[base_info] = [(item[3], item[4], item[5])]
-                    else:
-                        info[base_info].append((item[3], item[4], item[5]))
-                for k, v in info.items():
-                    result = {'cluster_id': k[0], 'anchor_img': k[1], 'similarity': k[2]}
-                    repo_infos = []
-                    for i in v:
-                        repo_info = {'person_id': i[0], 'repository_id': i[1], 'name': i[2]}
-                        repo_infos.append(repo_info)
-                    result['repository_infos'] = repo_infos
-                    results.append(result)
-                ret['results'] = results
-                ret['time_used'] = round((time.time() - start) * 1000)
+            try:
+                if data['query_id'] in process_status:
+                    process_code = process_status[data['query_id']].get(timeout = 0.01)
+                    if process_code == -3:
+                        logger.info('db select error', 'query_id: {}'.format(data['query_id']))
+                    elif process_code == -2:
+                        logger.info('faiss searcher service error', 'query_id: {}'.format(data['query_id']))
+                    elif process_code == -1:
+                        logger.info('verifier service error', 'query_id: {}'.format(data['query_id']))
+                    elif process_code == 0:
+                        # 第二次查询
+                        del process_status[data['query_id']]
+                        ret = __find(db, data, logger)
+                        ret['time_used'] = round((time.time() - start) * 1000)
+                elif tmp is not None and tmp[0][0] >0:
+                    # 第三次查询
+                    ret = __find(db, data, logger)
+                    ret['time_used'] = round((time.time() - start) * 1000)
+            except mp.TimeoutError:
+                logger.info('query task 正在进行中')
+                ret['rtn'] = -4
+                ret['message'] = SEARCH_ERR['query_in_progress']
+                ret['status'] = SEARCH_ERR['doing']
     logger.info('search1 api return: ', ret)
     db.close()
     return json.dumps(ret)

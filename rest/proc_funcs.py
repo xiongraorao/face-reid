@@ -23,7 +23,7 @@ from util import trans_sqlin, trans_sqlinsert, get_db_client
 
 config = configparser.ConfigParser()
 config.read('./app.config')
-threshold = config.get('sys', 'threshold')  # 用于过滤找到的topk人脸
+threshold = config.getfloat('sys', 'threshold')  # 用于过滤找到的topk人脸
 
 
 def search_proc(data, query_id, config):
@@ -90,11 +90,15 @@ def search_proc(data, query_id, config):
                     logger.error('insert to t_search failed')
             else:
                 logger.error('select from t_cluster failed or result is null')
+                return -3
         else:
             logger.error('faiss searcher service error, error message: ', search_result['message'])
+            return -2
     else:
         logger.error('verifier service error')
+        return -1
     time_used = round(time.time() - start)
     logger.info('search process(%d) have done, cost time = %d s ' % (os.getpid(), time_used))
     logger.info('=====proc: %s end, query_id: %s =====' % (os.getpid(), query_id))
     db.close()
+    return 0

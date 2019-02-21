@@ -21,7 +21,7 @@ from util import trans_sqlin
 logger = Log('index', 'logs/')
 config = configparser.ConfigParser()
 config.read('./app.config')
-threshold = config.get('sys', 'threshold')  # 判断人脸特征的阈值
+threshold = config.getfloat('sys', 'threshold')  # 判断人脸特征的阈值
 topk = 5
 
 re_cluster = False
