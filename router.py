@@ -21,6 +21,7 @@ class Router():
         self.curSocketIndex = -1 # sockets 列表的下标，当前使用的 socket，-1 表示使用默认值，-2 表示不可用
         self.layersList = [] # layers 列表
         self.zkNodeTimeOut = 6 # znode 超时时间，单位 s
+        self.zkNodeDropTimeOut = 86400 # znode 超时过长时间就抛弃，单位 s
         self.socketsListTryLoop = 5 # socketsList 循环尝试数
 
         # 读配置文件
@@ -38,20 +39,29 @@ class Router():
 
     def refreshSocket(self): # 刷新 socket
         if len(self.socketsList) == 0 or self.socketsList[0] == '': # sockets 列表为空时无变化
+            self.socket = "192.168.1.6:1234"
+            self.curSocketIndex = -2
             return
-        c = len(self.socketsList) * self.socketsListTryLoop
-        tmpSocketIndex = self.curSocketIndex
+        curSocketIndex = self.curSocketIndex # 复制
+        socketsList = self.socketsList[:] # 复制
+        c = len(socketsList) * self.socketsListTryLoop
+        tmpSocketIndex = curSocketIndex
         while c > 0:
             tmpSocketIndex += 1
-            if tmpSocketIndex >= len(self.socketsList): # 循环
+            if tmpSocketIndex >= len(socketsList): # 循环
                 tmpSocketIndex = 0
-            data, stat = self.zk.get("/router/"+self.socketsList[tmpSocketIndex])
-            if data.decode("utf-8") == "" or time.time() - float(data.decode("utf-8")) > self.zkNodeTimeOut: # socket 超时
-                c -= 1
+            if self.zk.exists("/router/"+socketsList[tmpSocketIndex]):
+                data, stat = self.zk.get("/router/"+socketsList[tmpSocketIndex])
+                if time.time() - stat.mtime / 1000 > self.zkNodeTimeOut: # socket 超时
+                    if time.time() - stat.mtime / 1000 > self.zkNodeDropTimeOut: # socket 严重超时
+                        self.zk.delete("/router/"+socketsList[tmpSocketIndex])
+                    c -= 1
+                else:
+                    self.socket = socketsList[tmpSocketIndex]
+                    self.curSocketIndex = tmpSocketIndex
+                    break
             else:
-                self.socket = self.socketsList[tmpSocketIndex]
-                self.curSocketIndex = tmpSocketIndex
-                break
+                c -= 1
         if c == 0:
             self.socket = "192.168.1.6:1234"
             self.curSocketIndex = -2
@@ -90,11 +100,11 @@ def watchChildren(childrenList):
         print("no change")
         return
     if router.curSocketIndex >= 0 and router.socketsList[router.curSocketIndex] in eqList:
+        router.curSocketIndex = eqList.index(router.socketsList[router.curSocketIndex])
         router.socketsList = eqList.extend(cOnlyList)
     else:
         router.socketsList = eqList + cOnlyList
-        if router.curSocketIndex != -1:
-            router.curSocketIndex = len(eqList) - 1
+        router.curSocketIndex = -1
     print(router.socketsList, router.curSocketIndex)
 
 # 路由 匹配
@@ -106,16 +116,17 @@ def viewFunction(layers):
         return json.dumps(errRet)
     else:
         router.refreshSocket() # 刷新 socket
-        if router.curSocketIndex == -2: # 无可用 socket
+        if router.curSocketIndex < 0: # 无可用 socket
             errRet["message"] = "no useful socket"
             return json.dumps(errRet)
         try:
+            socket = router.socket # 复制
             if request.method == "POST":
-                r = requests.post("http://"+router.socket+"/"+layers,data=request.get_data(),headers=router.headers)
-                return "From "+router.socket+": "+r.text
+                r = requests.post("http://"+socket+"/"+layers,data=request.get_data(),headers=router.headers)
+                return "From "+socket+": "+r.text
             elif request.method == "GET":
-                r = requests.get("http://"+router.socket+"/"+layers,data=request.get_data(),headers=router.headers)
-                return "From "+router.socket+": "+r.text
+                r = requests.get("http://"+socket+"/"+layers,data=request.get_data(),headers=router.headers)
+                return "From "+socket+": "+r.text
             else:
                 errRet["message"] = "method not support"
                 return json.dumps(errRet)
