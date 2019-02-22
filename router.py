@@ -6,6 +6,7 @@ import configparser
 from kazoo.client import KazooClient
 import time
 from util import Log
+import sys
 
 # 自定义转换器
 class RegexConverter(BaseConverter):
@@ -97,9 +98,13 @@ class Router():
 app = Flask(__name__)
 app.url_map.converters["re"] = RegexConverter # 将自定义转换器添加到转换器字典中，并指定转换器使用时名字为: re
 
-router = Router() # 路由实例
-
 logger = Log("router","logs") # 日志
+
+try:
+    router = Router() # 路由实例
+except Exception as e:
+    logger.info("Router Initialize Failed:",str(e))
+    sys.exit(1)
 
 # 监听 znode /router/...
 @router.zk.ChildrenWatch("/router")

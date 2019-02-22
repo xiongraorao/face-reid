@@ -2,7 +2,7 @@ import configparser
 import json
 import threading
 import time
-import schedule
+import sys
 
 import pymysql
 import requests
@@ -10,6 +10,10 @@ from flask import Flask
 
 from rest import bp_camera, bp_search, bp_peer, bp_freq, bp_repo, bp_trace, watch_dog
 from util import Mysql
+
+from kazoo.client import KazooClient
+
+from router import Router
 
 app = Flask(__name__)
 app.register_blueprint(bp_camera, url_prefix='/camera')
@@ -165,6 +169,17 @@ def check_grab():
 if __name__ == '__main__':
     t = threading.Thread(target=init)
     t.start()
-    t2 = threading.Thread(target=check_grab)
-    t2.start()
-    app.run('0.0.0.0')
+    
+    ip = "192.168.1.6"
+    port = "8000"
+
+    try:
+        router = Router(isForUpdate=True) # 路由实例
+    except Exception as e:
+        logger.info("Router Initialize Failed:",str(e))
+        sys.exit(1)
+
+    t1 = threading.Thread(target=router.updateZookeeper, args=(ip,port))
+    t1.start()
+
+    app.run(host='0.0.0.0',port=int(port))
