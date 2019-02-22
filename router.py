@@ -159,7 +159,6 @@ def viewFunction(layers):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0",port=9000)
-    router.disconZookeeper() # 断开与 zookeeper 的连接
 
 
 

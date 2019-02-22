@@ -172,5 +172,3 @@ if __name__ == '__main__':
     t1.start()
 
     app.run(host='0.0.0.0',port=int(port))
-
-    router.disconZookeeper() # 断开与 zookeeper 的连接
