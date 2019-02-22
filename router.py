@@ -5,6 +5,7 @@ import requests
 import configparser
 from kazoo.client import KazooClient
 import time
+from util import Log
 
 # 自定义转换器
 class RegexConverter(BaseConverter):
@@ -14,25 +15,33 @@ class RegexConverter(BaseConverter):
 
 # 路由类
 class Router():
-    def __init__(self): # 初始化
-        self.socket = "192.168.1.6:1234"
-        self.headers = {'content-type': "application/json"}
-        self.socketsList = [] # sockets 列表
-        self.curSocketIndex = -1 # sockets 列表的下标，当前使用的 socket，-1 表示使用默认值，-2 表示不可用
-        self.layersList = [] # layers 列表
-        self.zkNodeTimeOut = 6 # znode 超时时间，单位 s
-        self.zkNodeDropTimeOut = 86400 # znode 超时过长时间就抛弃，单位 s
-        self.socketsListTryLoop = 5 # socketsList 循环尝试数
+    def __init__(self, isForUpdate=False): # 初始化
+        if not isForUpdate:
+            self.socket = "192.168.1.6:1234"
+            self.headers = {'content-type': "application/json"}
+            self.socketsList = [] # sockets 列表
+            self.curSocketIndex = -1 # sockets 列表的下标，当前使用的 socket，-1 表示使用默认值，-2 表示不可用
+            self.layersList = [] # layers 列表
+            self.zkNodeTimeOut = 6 # znode 超时时间，单位 s
+            self.zkNodeDropTimeOut = 86400 # znode 超时过长时间就抛弃，单位 s
+            self.socketsListTryLoop = 5 # socketsList 循环尝试数
 
-        # 读配置文件
-        self.config = configparser.ConfigParser()
-        self.config.read("./router.config")
+            # 读配置文件
+            self.config = configparser.ConfigParser()
+            self.config.read("./router.config")
         
-        self.conZookeeper() # 连接 zookeeper
+            self.conZookeeper() # 连接 zookeeper
 
-        self.refreshSocketsList() # 刷新 sockets 列表
+            self.refreshSocketsList() # 刷新 sockets 列表
 
-        self.refreshLayersList() # 刷新 layers 列表
+            self.refreshLayersList() # 刷新 layers 列表
+
+        else: # 用于更新 zookeeper
+            # 读配置文件
+            self.config = configparser.ConfigParser()
+            self.config.read("./router.config")
+
+            self.conZookeeper() # 连接 zookeeper
 
     def refreshSocketsList(self): # 刷新 sockets 列表
         self.socketsList = self.zk.get_children("/router")
@@ -78,17 +87,25 @@ class Router():
     def disconZookeeper(self): # 断开与 zookeeper 的连接
         self.zk.stop()
 
+    def updateZookeeper(self, ip, port): # 更新 zookeeper
+        self.zk.ensure_path("/router/"+ip+":"+port)
+        while True:
+            self.zk.set("/router/"+ip+":"+port,str(time.time()).encode())
+            time.sleep(2)
+
 
 app = Flask(__name__)
 app.url_map.converters["re"] = RegexConverter # 将自定义转换器添加到转换器字典中，并指定转换器使用时名字为: re
 
 router = Router() # 路由实例
 
+logger = Log("router","logs") # 日志
+
 # 监听 znode /router/...
 @router.zk.ChildrenWatch("/router")
 def watchChildren(childrenList):
     if len(childrenList) == 0: # sockets 全下线
-        print("no sockets")
+        logger.info("Router Znodes Change: None Left")
         router.socketsList = []
         router.socket = "192.168.1.6:1234"
         router.curSocketIndex = -2
@@ -97,7 +114,7 @@ def watchChildren(childrenList):
     sOnlyList = [val for val in router.socketsList if val not in childrenList]
     cOnlyList = [val for val in childrenList if val not in router.socketsList]
     if len(sOnlyList) == 0 and len(cOnlyList) == 0: # sockets 无变化
-        print("no change")
+        logger.info("Router Znodes Change: No Change, Left " + (",".join(childrenList)))
         return
     if router.curSocketIndex >= 0 and router.socketsList[router.curSocketIndex] in eqList:
         router.curSocketIndex = eqList.index(router.socketsList[router.curSocketIndex])
@@ -105,32 +122,38 @@ def watchChildren(childrenList):
     else:
         router.socketsList = eqList + cOnlyList
         router.curSocketIndex = -1
-    print(router.socketsList, router.curSocketIndex)
+    logger.info("Router Znodes Change: Left " + (",".join(childrenList)))
 
 # 路由 匹配
 @app.route("/<re('([a-zA-Z\d_](/[a-zA-Z\d_])*)*'):layers>",methods=["POST","GET"])
 def viewFunction(layers):
     errRet = {'time_used': 0, 'rtn': -1, 'id': -1, 'message': ''}
     if layers not in router.layersList: # 未在配置中
+        logger.info(request.method,"For",request.url,", Data:",str(request.get_data()),", Result: Not Found 404")
         errRet["message"] = "not found 404"
         return json.dumps(errRet)
     else:
         router.refreshSocket() # 刷新 socket
         if router.curSocketIndex < 0: # 无可用 socket
+            logger.info(request.method,"For",request.url,", Data:",str(request.get_data()),", Result: No Useful Socket")
             errRet["message"] = "no useful socket"
             return json.dumps(errRet)
         try:
             socket = router.socket # 复制
             if request.method == "POST":
                 r = requests.post("http://"+socket+"/"+layers,data=request.get_data(),headers=router.headers)
-                return "From "+socket+": "+r.text
+                logger.info(request.method,"For",request.url,", Data:",str(request.get_data()),", Result: Routed To",socket,", Return:",r.text)
+                return r.text
             elif request.method == "GET":
                 r = requests.get("http://"+socket+"/"+layers,data=request.get_data(),headers=router.headers)
-                return "From "+socket+": "+r.text
+                logger.info(request.method,"For",request.url,", Data:",str(request.get_data()),", Result: Routed To",socket,", Return:",r.text)
+                return r.text
             else:
+                logger.info(request.method,"For",request.url,", Data:",str(request.get_data()),", Result: Method Not Support")
                 errRet["message"] = "method not support"
                 return json.dumps(errRet)
-        except requests.exceptions.ConnectionError:
+        except Exception as e:
+            logger.info(request.method,"For",request.url,", Data:",str(request.get_data()),", Result:",str(e))
             errRet["message"] = "connection error"
             return json.dumps(errRet)
 

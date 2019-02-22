@@ -12,6 +12,8 @@ from util import Mysql
 
 from kazoo.client import KazooClient
 
+from router import Router
+
 app = Flask(__name__)
 app.register_blueprint(bp_camera, url_prefix='/camera')
 app.register_blueprint(bp_search, url_prefix='/search')
@@ -156,20 +158,19 @@ def init():
         logger.info('camera id =', id, ', response: ', response.json())
     logger.info('camera task initialize complete')
 
-def updateZookeeper(port):
-    config = configparser.ConfigParser()
-    config.read("./router.config")
-    zk = KazooClient(config.get("zoo1","hosts"))
-    zk.start()
-    zk.ensure_path("/router/192.168.1.6:"+str(port))
-    while True:
-        zk.set("/router/192.168.1.6:"+str(port),str(time.time()).encode())
-        time.sleep(2)
 
 if __name__ == '__main__':
-    port = 8000
     t = threading.Thread(target=init)
     t.start()
-    t1 = threading.Thread(target=updateZookeeper, args=(port,))
+    
+    ip = "192.168.1.6"
+    port = "8000"
+
+    router = Router(isForUpdate=True)
+
+    t1 = threading.Thread(target=router.updateZookeeper, args=(ip,port))
     t1.start()
-    app.run(host='0.0.0.0',port=port)
+
+    app.run(host='0.0.0.0',port=int(port))
+
+    router.disconZookeeper() # 断开与 zookeeper 的连接
